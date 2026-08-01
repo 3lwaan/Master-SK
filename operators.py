@@ -5,6 +5,7 @@ from .rig_utils import (
     apply_transforms,
     rename_armature_and_datablock,
     purge_all_bone_collections,
+    merge_hip_weights_to_pelvis,
     purge_bones_and_restructure_hierarchy,
     sync_bone_and_vertex_group_names,
     inject_ue5_als_ik_bones,
@@ -67,16 +68,19 @@ class MSK_OT_process_rig_vertex_groups(bpy.types.Operator):
             # 2. Completely wipe all Bone Collections (Blender 4.4.3 un-grouped structure)
             purge_all_bone_collections(armature_obj)
 
-            # 3. Bone Purge & Hierarchy Restructuring (Edit Mode: pelvic top-level bone)
+            # 3. Merge vertex weights from 'hip' into 'pelvis' before purging hip bone to prevent skinning bugs
+            merge_hip_weights_to_pelvis(mesh_objs)
+
+            # 4. Bone Purge & Hierarchy Restructuring (Edit Mode: root -> pelvis)
             purge_bones_and_restructure_hierarchy(armature_obj, ref_data)
 
-            # 4. Synchronized Vertex Group Renaming & Cleanup
+            # 5. Synchronized Vertex Group Renaming & Cleanup
             sync_bone_and_vertex_group_names(armature_obj, mesh_objs, ref_data)
 
             props.step2_completed = True
             props.status_message = f"Step 2 Complete: Restructured '{armature_obj.name}' (Data: 'root') & synced weights."
             
-            self.report({'INFO'}, f"Rig hierarchy restructured to 'pelvis' top-level and vertex groups synchronized for '{armature_obj.name}'.")
+            self.report({'INFO'}, f"Rig hierarchy restructured to 'root' -> 'pelvis' and vertex groups synchronized for '{armature_obj.name}'.")
             return {'FINISHED'}
 
         except Exception as e:
@@ -136,11 +140,28 @@ class MSK_OT_reload_reference(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MSK_OT_reset_progress(bpy.types.Operator):
+    """Reset step completion checkmarks and status message."""
+    bl_idname = "master_sk.reset_progress"
+    bl_label = "Reset Step Progress"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        props = context.scene.master_sk_props
+        props.step1_completed = False
+        props.step2_completed = False
+        props.step3_completed = False
+        props.status_message = "Ready. Select your DAZ Armature and Character Mesh to begin."
+        self.report({'INFO'}, "Master SK workflow progress reset.")
+        return {'FINISHED'}
+
+
 classes = (
     MSK_OT_prepare_character,
     MSK_OT_process_rig_vertex_groups,
     MSK_OT_inject_ik_bones,
     MSK_OT_reload_reference,
+    MSK_OT_reset_progress,
 )
 
 def register_operators():

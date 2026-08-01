@@ -13,10 +13,36 @@ class MSK_PT_main_panel(bpy.types.Panel):
         scene = context.scene
         props = scene.master_sk_props
 
+        # Calculate progress step counter
+        completed_steps = sum([props.step1_completed, props.step2_completed, props.step3_completed])
+        
         # Header Box
         header_box = layout.box()
-        header_row = header_box.row(align=True)
-        header_row.label(text="Master SK - DAZ Genesis 9", icon='ARMATURE_DATA')
+        h_row = header_box.row(align=True)
+        h_row.label(text="Master SK Pipeline", icon='ARMATURE_DATA')
+        h_row.label(text=f"[{completed_steps}/3 Done]")
+
+        # Active Selection Info Box
+        sel_box = layout.box()
+        s_col = sel_box.column(align=True)
+        
+        armature_obj = None
+        mesh_names = []
+        for obj in context.selected_objects:
+            if obj.type == 'ARMATURE':
+                armature_obj = obj
+            elif obj.type == 'MESH':
+                mesh_names.append(obj.name)
+
+        if armature_obj:
+            s_col.label(text=f"Rig: {armature_obj.name}", icon='POSE_HLT')
+        else:
+            s_col.label(text="Rig: None Selected", icon='RADIOBUT_OFF')
+
+        if mesh_names:
+            s_col.label(text=f"Mesh: {', '.join(mesh_names[:2])}", icon='OUTLINER_OB_MESH')
+        else:
+            s_col.label(text="Mesh: None Selected", icon='RADIOBUT_OFF')
 
         # Status Message Box
         if props.status_message:
@@ -36,15 +62,15 @@ class MSK_PT_main_panel(bpy.types.Panel):
         step1_box = layout.box()
         s1_row = step1_box.row(align=True)
         s1_icon = 'CHECKMARK' if props.step1_completed else 'RADIOBUT_OFF'
-        s1_row.label(text="Step 1: Preparation", icon=s1_icon)
+        s1_row.label(text="Step 1: Prepare Character", icon=s1_icon)
 
-        # Guide Text
-        guide_col = step1_box.column(align=True)
-        guide_col.scale_y = 0.8
-        guide_col.label(text="Select DAZ Armature & Character Mesh", icon='HELP')
+        g1_col = step1_box.column(align=True)
+        g1_col.scale_y = 0.8
+        g1_col.label(text="Select Armature & Mesh; apply transforms", icon='HELP')
         
-        # Step 1 Operator Button
-        btn1 = step1_box.operator("master_sk.prepare_character", text="1. Prepare Active Character", icon='PLAY')
+        b1_col = step1_box.column(align=True)
+        b1_col.scale_y = 1.25
+        b1_col.operator("master_sk.prepare_character", text="1. Prepare Active Character", icon='PLAY')
 
         layout.separator()
 
@@ -54,11 +80,13 @@ class MSK_PT_main_panel(bpy.types.Panel):
         s2_icon = 'CHECKMARK' if props.step2_completed else 'RADIOBUT_OFF'
         s2_row.label(text="Step 2: Rig & Weight Sync", icon=s2_icon)
 
-        s2_guide = step2_box.column(align=True)
-        s2_guide.scale_y = 0.8
-        s2_guide.label(text="Purge helpers, align hierarchy, sync weights", icon='HELP')
+        g2_col = step2_box.column(align=True)
+        g2_col.scale_y = 0.8
+        g2_col.label(text="Purge helpers, merge hip weights, align rig", icon='HELP')
 
-        btn2 = step2_box.operator("master_sk.process_rig_vertex_groups", text="2. Process Rig & Sync Vertex Groups", icon='MOD_ARMATURE')
+        b2_col = step2_box.column(align=True)
+        b2_col.scale_y = 1.25
+        b2_col.operator("master_sk.process_rig_vertex_groups", text="2. Process Rig & Sync Vertex Groups", icon='MOD_ARMATURE')
 
         layout.separator()
 
@@ -66,26 +94,30 @@ class MSK_PT_main_panel(bpy.types.Panel):
         step3_box = layout.box()
         s3_row = step3_box.row(align=True)
         s3_icon = 'CHECKMARK' if props.step3_completed else 'RADIOBUT_OFF'
-        s3_row.label(text="Step 3: Inject UE5 / ALS IK Bones", icon=s3_icon)
+        s3_row.label(text="Step 3: Inject IK Bones", icon=s3_icon)
 
-        s3_guide = step3_box.column(align=True)
-        s3_guide.scale_y = 0.8
-        s3_guide.label(text="Inject ik_foot & ik_hand bones (UE5 / ALS)", icon='HELP')
+        g3_col = step3_box.column(align=True)
+        g3_col.scale_y = 0.8
+        g3_col.label(text="Inject ik_foot & ik_hand bones (UE5 / ALS)", icon='HELP')
 
-        btn3 = step3_box.operator("master_sk.inject_ik_bones", text="3. Inject UE5 / ALS IK Bones", icon='BONE_DATA')
+        b3_col = step3_box.column(align=True)
+        b3_col.scale_y = 1.25
+        b3_col.operator("master_sk.inject_ik_bones", text="3. Inject UE5 / ALS IK Bones", icon='BONE_DATA')
 
         layout.separator()
 
-        # REFERENCE FILE SETTINGS BOX
-        ref_box = layout.box()
-        ref_header = ref_box.row()
-        ref_header.label(text="Reference File Configuration", icon='FILE_TEXT')
+        # CONFIGURATION & UTILITIES BOX
+        util_box = layout.box()
+        u_header = util_box.row()
+        u_header.label(text="Reference & Utilities", icon='SETTINGS')
 
-        ref_box.prop(props, "use_custom_reference", text="Custom Reference Path")
+        util_box.prop(props, "use_custom_reference", text="Custom Reference Path")
         if props.use_custom_reference:
-            ref_box.prop(props, "custom_reference_path", text="Path")
+            util_box.prop(props, "custom_reference_path", text="Path")
 
-        ref_box.operator("master_sk.reload_reference", text="Reload Reference File", icon='FILE_REFRESH')
+        u_row = util_box.row(align=True)
+        u_row.operator("master_sk.reload_reference", text="Reload Ref", icon='FILE_REFRESH')
+        u_row.operator("master_sk.reset_progress", text="Reset Progress", icon='LOOP_BACK')
 
 
 def register_panel():

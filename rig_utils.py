@@ -103,6 +103,7 @@ def rename_armature_and_datablock(armature_obj, mesh_objs):
     """
     1. Armature Object Name (Orange Icon): Renames to 'SKM_' + mesh_name (e.g. 'SKM Nina' / 'SKM_Nina').
     2. Armature Data Block Name (Green Icon): Renames armature.data.name directly to 'root'.
+       Frees up conflicting datablocks in bpy.data.armatures so the active datablock receives the exact name 'root'.
     """
     if mesh_objs:
         mesh_name = mesh_objs[0].name.replace(".001", "").strip()
@@ -112,7 +113,19 @@ def rename_armature_and_datablock(armature_obj, mesh_objs):
             target_obj_name = mesh_name
         armature_obj.name = target_obj_name
 
-    armature_obj.data.name = "root"
+    # Free up 'root' name in bpy.data.armatures if another datablock holds it
+    current_data = armature_obj.data
+    for other_arm in list(bpy.data.armatures):
+        if other_arm != current_data and other_arm.name in ["root", "root.001", "root.002", "root.003"]:
+            if other_arm.users == 0:
+                try:
+                    bpy.data.armatures.remove(other_arm)
+                except Exception:
+                    other_arm.name = f"old_{other_arm.name}"
+            else:
+                other_arm.name = f"old_{other_arm.name}"
+
+    current_data.name = "root"
 
 
 def purge_all_bone_collections(armature_obj):
@@ -126,15 +139,52 @@ def purge_all_bone_collections(armature_obj):
             arm_data.collections.remove(arm_data.collections[0])
 
 
+def merge_hip_weights_to_pelvis(mesh_objs):
+    """
+    Merges vertex group weights from 'hip' into 'pelvis' on all mesh objects
+    before deleting the 'hip' bone, preventing weight paint skinning issues.
+    """
+    for mesh_obj in mesh_objs:
+        if not mesh_obj or mesh_obj.type != 'MESH':
+            continue
+
+        vgroups = mesh_obj.vertex_groups
+        hip_vg = vgroups.get("hip")
+        if not hip_vg:
+            continue
+
+        pelvis_vg = vgroups.get("pelvis")
+        if not pelvis_vg:
+            hip_vg.name = "pelvis"
+            continue
+
+        # Both hip and pelvis vertex groups exist: merge hip weights into pelvis
+        mesh_data = mesh_obj.data
+        for v in mesh_data.vertices:
+            hip_w = 0.0
+            pelvis_w = 0.0
+            for g in v.groups:
+                if g.group == hip_vg.index:
+                    hip_w = g.weight
+                elif g.group == pelvis_vg.index:
+                    pelvis_w = g.weight
+
+            if hip_w > 0.0:
+                combined_w = min(1.0, hip_w + pelvis_w)
+                pelvis_vg.add([v.index], combined_w, 'REPLACE')
+                hip_vg.remove([v.index])
+
+        try:
+            vgroups.remove(hip_vg)
+        except Exception as e:
+            print(f"[MasterSK] Could not remove hip vertex group: {e}")
+
+
 def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     """
     Step 2 Rig Processing (Edit Mode):
-    - Purges extra physical 'root' bone, anchor bones, and driven bones (*(drv)*).
-    - Resolves 'pelvis_temp_conflict': deletes pre-existing helper 'pelvis' or 'root' bones first before renaming 'hip' -> 'pelvis'.
-    - Restructures hierarchy per MASTER_SK_HIERARCHY:
-      - Top-level bone is 'pelvis' (parent is None).
-      - spine_04 is parent of neck01, clavicle_l, clavicle_r, pectoral_l, pectoral_r.
-      - Metacarpals are parented to hand_l/hand_r, and finger 01 bones parented to metacarpals.
+    - Deletes 'root', 'hip', anchor bones, and driven bones (*(drv)*).
+    - Top-level deformation bone is 'pelvis' (parent is None).
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
     hierarchy = reference_data.get("MASTER_SK_HIERARCHY", {})
@@ -143,29 +193,19 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     with ArmatureModeGuard(armature_obj, 'EDIT'):
         edit_bones = armature_obj.data.edit_bones
 
-        # 1. First, delete physical 'root' / 'Root' bones and explicitly marked bones
-        explicit_delete = set(bones_to_delete_list) | {"root", "Root", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
+        # 1. Delete physical 'root' / 'Root' / 'hip' bones and explicitly marked anchor/driven bones
+        explicit_delete = set(bones_to_delete_list) | {"root", "Root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
         
         for eb in list(edit_bones):
             b_name = eb.name
             b_name_lower = b_name.lower()
             
-            if b_name in explicit_delete or b_name_lower in ["root", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"]:
+            if b_name in explicit_delete or b_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"]:
                 edit_bones.remove(eb)
             elif "(drv)" in b_name_lower or fnmatch.fnmatch(b_name_lower, "*(drv)*"):
                 edit_bones.remove(eb)
 
-        # 2. Resolve pelvis_temp_conflict:
-        hip_bone = edit_bones.get("hip")
-        pre_pelvis = edit_bones.get("pelvis")
-        
-        if hip_bone and pre_pelvis and pre_pelvis != hip_bone:
-            edit_bones.remove(pre_pelvis)
-
-        if hip_bone:
-            hip_bone.name = "pelvis"
-
-        # 3. Perform bone mapping & renaming for remaining bones cleanly
+        # 2. Perform bone mapping & renaming for remaining bones cleanly
         for eb in list(edit_bones):
             orig_name = eb.name
             if orig_name in daz_map:
@@ -175,12 +215,12 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                         edit_bones.remove(edit_bones[target_name])
                     eb.name = target_name
 
-        # 4. Enforce Top-Level Hierarchy Rules
+        # 3. Ensure pelvis is top-level (parent is None)
         pelvis_eb = edit_bones.get("pelvis")
         if pelvis_eb:
             pelvis_eb.parent = None
 
-        # 5. Restructure remaining bones according to MASTER_SK_HIERARCHY with fallback handling
+        # 4. Restructure remaining bones according to MASTER_SK_HIERARCHY with fallback handling
         for child_target, parent_target in hierarchy.items():
             child_eb = edit_bones.get(child_target)
             if child_eb:
@@ -215,7 +255,7 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
     bones_to_delete_list = reference_data.get("BONES_TO_DELETE", [])
-    deleted_names = set(bones_to_delete_list) | {"root", "Root", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
+    deleted_names = set(bones_to_delete_list) | {"root", "Root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
 
     all_armature_bone_names = set(b.name for b in armature_obj.data.bones)
 
@@ -230,10 +270,9 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
             vg_name = vg.name
             vg_name_lower = vg_name.lower()
 
-            # Check if this group corresponds to a deleted bone or driven pattern
             is_deleted = (
                 vg_name in deleted_names or
-                vg_name_lower in ["root", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
+                vg_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
                 "(drv)" in vg_name_lower or
                 fnmatch.fnmatch(vg_name_lower, "*(drv)*")
             )
@@ -242,23 +281,19 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
                 groups_to_remove.append(vg)
                 continue
 
-            # Rename matching vertex groups
             if vg_name in daz_map:
                 new_vg_name = daz_map[vg_name]
                 vg.name = new_vg_name
 
-            # Re-check updated group name against active bones
             if vg.name not in all_armature_bone_names:
                 groups_to_remove.append(vg)
 
-        # Remove orphaned vertex groups
         for vg in groups_to_remove:
             try:
                 vgroups.remove(vg)
             except Exception as e:
                 print(f"[MasterSK] Error removing vertex group '{vg.name}': {e}")
 
-        # Purge Zero-Weight Vertex Assignments
         purge_zero_weight_assignments(mesh_obj)
 
 
@@ -288,13 +323,15 @@ def purge_zero_weight_assignments(mesh_obj, threshold=0.0001):
 def inject_ue5_als_ik_bones(armature_obj):
     """
     Step 3 Operator Logic:
-    - Creates UE5 / ALS standard top-level IK bones (parent is None):
-      ik_foot_root -> Parent: None (Top-level bone)
-      ik_foot_l    -> Parent: ik_foot_root (Snaps matrix to foot_l, roll offset 0 deg)
-      ik_foot_r    -> Parent: ik_foot_root (Snaps matrix to foot_r, roll offset 0 deg)
-      ik_hand_root -> Parent: None (Top-level bone)
-      ik_hand_l    -> Parent: ik_hand_root (Snaps matrix to hand_l, roll offset 0 deg)
-      ik_hand_r    -> Parent: ik_hand_root (Snaps matrix to hand_r, roll offset 0 deg)
+    - Root IK Bones (ik_foot_root, ik_hand_root):
+        Head: (0.0, 0.0, 0.0), Tail: (0.0, 0.0, 0.2), length = 0.2 meters.
+        Parent: None (Top-level IK roots, no physical root edit bone).
+    - Foot IK Bones (ik_foot_l, ik_foot_r):
+        Snap head to foot_l/r.head, copy matrix, length = target_foot_bone.length (or 0.15).
+        Parent: ik_foot_root.
+    - Hand IK Bones (ik_hand_l, ik_hand_r):
+        Snap head to hand_l/r.head, copy matrix, length = target_hand_bone.length (or 0.15).
+        Parent: ik_hand_root.
     """
     with ArmatureModeGuard(armature_obj, 'EDIT'):
         edit_bones = armature_obj.data.edit_bones
@@ -304,68 +341,70 @@ def inject_ue5_als_ik_bones(armature_obj):
                 return edit_bones[name]
             return edit_bones.new(name)
 
-        # 1. Foot IK Hierarchy (Top-level root)
+        # 0. Ensure physical 'root' / 'Root' edit bone is deleted if present
+        for r_name in ["root", "Root"]:
+            if r_name in edit_bones:
+                edit_bones.remove(edit_bones[r_name])
+
+        # 1. Root IK Bones (ik_foot_root, ik_hand_root - Top-Level)
         ik_foot_root = get_or_create_bone("ik_foot_root")
         ik_foot_root.head = (0.0, 0.0, 0.0)
-        ik_foot_root.tail = (0.0, 0.2, 0.0)
-        ik_foot_root.roll = 0.0
+        ik_foot_root.tail = (0.0, 0.0, 0.2)
+        ik_foot_root.length = 0.2
         ik_foot_root.parent = None
 
-        # ik_foot_l
+        ik_hand_root = get_or_create_bone("ik_hand_root")
+        ik_hand_root.head = (0.0, 0.0, 0.0)
+        ik_hand_root.tail = (0.0, 0.0, 0.2)
+        ik_hand_root.length = 0.2
+        ik_hand_root.parent = None
+
+        # 2. Foot IK Bones (ik_foot_l, ik_foot_r)
         foot_l = edit_bones.get("foot_l") or edit_bones.get("l_foot")
         ik_foot_l = get_or_create_bone("ik_foot_l")
         ik_foot_l.parent = ik_foot_root
         if foot_l:
             ik_foot_l.head = foot_l.head.copy()
-            ik_foot_l.tail = foot_l.tail.copy()
             ik_foot_l.matrix = foot_l.matrix.copy()
+            ik_foot_l.length = max(0.12, foot_l.length)
         else:
             ik_foot_l.head = (0.2, 0.0, 0.1)
-            ik_foot_l.tail = (0.2, 0.2, 0.1)
-        ik_foot_l.roll = 0.0
+            ik_foot_l.tail = (0.2, 0.0, 0.25)
+            ik_foot_l.length = 0.15
 
-        # ik_foot_r
         foot_r = edit_bones.get("foot_r") or edit_bones.get("r_foot")
         ik_foot_r = get_or_create_bone("ik_foot_r")
         ik_foot_r.parent = ik_foot_root
         if foot_r:
             ik_foot_r.head = foot_r.head.copy()
-            ik_foot_r.tail = foot_r.tail.copy()
             ik_foot_r.matrix = foot_r.matrix.copy()
+            ik_foot_r.length = max(0.12, foot_r.length)
         else:
             ik_foot_r.head = (-0.2, 0.0, 0.1)
-            ik_foot_r.tail = (-0.2, 0.2, 0.1)
-        ik_foot_r.roll = 0.0
+            ik_foot_r.tail = (-0.2, 0.0, 0.25)
+            ik_foot_r.length = 0.15
 
-        # 2. Hand IK Hierarchy (Top-level root)
-        ik_hand_root = get_or_create_bone("ik_hand_root")
-        ik_hand_root.head = (0.0, 0.0, 0.0)
-        ik_hand_root.tail = (0.0, 0.2, 0.0)
-        ik_hand_root.roll = 0.0
-        ik_hand_root.parent = None
-
-        # ik_hand_l
+        # 3. Hand IK Bones (ik_hand_l, ik_hand_r)
         hand_l = edit_bones.get("hand_l") or edit_bones.get("l_hand")
         ik_hand_l = get_or_create_bone("ik_hand_l")
         ik_hand_l.parent = ik_hand_root
         if hand_l:
             ik_hand_l.head = hand_l.head.copy()
-            ik_hand_l.tail = hand_l.tail.copy()
             ik_hand_l.matrix = hand_l.matrix.copy()
+            ik_hand_l.length = max(0.15, hand_l.length)
         else:
             ik_hand_l.head = (0.6, 0.0, 1.4)
-            ik_hand_l.tail = (0.6, 0.2, 1.4)
-        ik_hand_l.roll = 0.0
+            ik_hand_l.tail = (0.6, 0.0, 1.55)
+            ik_hand_l.length = 0.15
 
-        # ik_hand_r
         hand_r = edit_bones.get("hand_r") or edit_bones.get("r_hand")
         ik_hand_r = get_or_create_bone("ik_hand_r")
         ik_hand_r.parent = ik_hand_root
         if hand_r:
             ik_hand_r.head = hand_r.head.copy()
-            ik_hand_r.tail = hand_r.tail.copy()
             ik_hand_r.matrix = hand_r.matrix.copy()
+            ik_hand_r.length = max(0.15, hand_r.length)
         else:
             ik_hand_r.head = (-0.6, 0.0, 1.4)
-            ik_hand_r.tail = (-0.6, 0.2, 1.4)
-        ik_hand_r.roll = 0.0
+            ik_hand_r.tail = (-0.6, 0.0, 1.55)
+            ik_hand_r.length = 0.15

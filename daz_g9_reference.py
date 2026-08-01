@@ -7,8 +7,7 @@ Contains:
 """
 
 DAZ_TO_MASTER_MAP = {
-    # Core Root / Hips
-    "hip": "pelvis",
+    # Core Pelvis
     "pelvis": "pelvis",
     
     # Spine Chain
@@ -151,25 +150,40 @@ DAZ_TO_MASTER_MAP = {
 }
 
 MASTER_SK_HIERARCHY = {
-    # Top-Level Deformation Bone
+    # Top-Level Deformation Bone (No physical root edit bone)
     "pelvis": None,
     
-    # Spine Chain
+    # Spine Chain (under pelvis)
     "spine_01": "pelvis",
     "spine_02": "spine_01",
     "spine_03": "spine_02",
     "spine_04": "spine_03",
     
-    # Neck & Head (neck01 & clavicles are children of spine_04)
+    # Legs (under pelvis)
+    "thigh_l": "pelvis",
+    "thigh_twist_01_l": "thigh_l",
+    "thigh_twist_02_l": "thigh_twist_01_l",
+    "calf_l": "thigh_l",
+    "foot_l": "calf_l",
+    "ball_l": "foot_l",
+    
+    "thigh_r": "pelvis",
+    "thigh_twist_01_r": "thigh_r",
+    "thigh_twist_02_r": "thigh_twist_01_r",
+    "calf_r": "thigh_r",
+    "foot_r": "calf_r",
+    "ball_r": "foot_r",
+    
+    # Pectorals (parented to spine_03)
+    "pectoral_l": "spine_03",
+    "pectoral_r": "spine_03",
+
+    # Neck & Head (parented to spine_04)
     "neck01": "spine_04",
     "neck02": "neck01",
     "head": "neck02",
 
-    # Pectorals (children of spine_04)
-    "pectoral_l": "spine_04",
-    "pectoral_r": "spine_04",
-    
-    # Clavicles & Arms (children of spine_04)
+    # Clavicles & Arms (parented to spine_04)
     "clavicle_l": "spine_04",
     "upperarm_l": "clavicle_l",
     "upperarm_twist_01_l": "upperarm_l",
@@ -232,22 +246,7 @@ MASTER_SK_HIERARCHY = {
     "pinky_01_r": "pinkymetacarpal_r",
     "pinky_02_r": "pinky_01_r",
     "pinky_03_r": "pinky_02_r",
-    
-    # Legs & Leg Twists
-    "thigh_l": "pelvis",
-    "thigh_twist_01_l": "thigh_l",
-    "thigh_twist_02_l": "thigh_twist_01_l",
-    "calf_l": "thigh_l",
-    "foot_l": "calf_l",
-    "ball_l": "foot_l",
-    
-    "thigh_r": "pelvis",
-    "thigh_twist_01_r": "thigh_r",
-    "thigh_twist_02_r": "thigh_twist_01_r",
-    "calf_r": "thigh_r",
-    "foot_r": "calf_r",
-    "ball_r": "foot_r",
-    
+
     # Toes (Left)
     "bigtoe_01_l": "ball_l",
     "bigtoe_02_l": "bigtoe_01_l",
@@ -272,7 +271,7 @@ MASTER_SK_HIERARCHY = {
     "pinkytoe_01_r": "ball_r",
     "pinkytoe_02_r": "pinkytoe_01_r",
 
-    # Top-Level IK Roots
+    # Top-Level IK Roots (No physical root edit bone parent)
     "ik_foot_root": None,
     "ik_foot_l": "ik_foot_root",
     "ik_foot_r": "ik_foot_root",
@@ -284,6 +283,7 @@ MASTER_SK_HIERARCHY = {
 BONES_TO_DELETE = [
     "root",
     "Root",
+    "hip",
     "l_hand_anchor",
     "r_hand_anchor",
     "l_foot_anchor",
