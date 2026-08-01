@@ -15,33 +15,64 @@ DAZ_TO_MASTER_MAP = {
     "spine1": "spine_01",
     "spine2": "spine_02",
     "spine3": "spine_03",
-    "neck": "neck_01",
+    "spine4": "spine_04",
+    "spine_01": "spine_01",
+    "spine_02": "spine_02",
+    "spine_03": "spine_03",
+    "spine_04": "spine_04",
+    
+    # Neck & Head
+    "neck": "neck01",
+    "neck1": "neck01",
+    "neck_01": "neck01",
+    "neck2": "neck02",
+    "neck_02": "neck02",
     "head": "head",
     
-    # Left Arm
-    "l_shoulder": "clavicle_l",
-    "l_arm": "upperarm_l",
-    "l_forearm": "lowerarm_l",
-    "l_hand": "hand_l",
+    # Pectorals
+    "l_pectoral": "pectoral_l",
+    "r_pectoral": "pectoral_r",
     
-    # Right Arm
+    # Clavicles & Arms
+    "l_shoulder": "clavicle_l",
     "r_shoulder": "clavicle_r",
+    "l_arm": "upperarm_l",
+    "l_upperarm": "upperarm_l",
     "r_arm": "upperarm_r",
+    "r_upperarm": "upperarm_r",
+    "l_forearm": "lowerarm_l",
+    "l_lowerarm": "lowerarm_l",
     "r_forearm": "lowerarm_r",
+    "r_lowerarm": "lowerarm_r",
+    "l_hand": "hand_l",
     "r_hand": "hand_r",
     
-    # Left Leg
-    "l_thigh": "thigh_l",
-    "l_shin": "calf_l",
-    "l_foot": "foot_l",
-    "l_toes": "ball_l",
-    
-    # Right Leg
-    "r_thigh": "thigh_r",
-    "r_shin": "calf_r",
-    "r_foot": "foot_r",
-    "r_toes": "ball_r",
-    
+    # Arm Twist Bones
+    "l_arm_twist": "upperarm_twist_01_l",
+    "l_upperarm_twist": "upperarm_twist_01_l",
+    "l_upperarmtwist1": "upperarm_twist_01_l",
+    "l_upperarmtwist2": "upperarm_twist_02_l",
+    "r_arm_twist": "upperarm_twist_01_r",
+    "r_upperarm_twist": "upperarm_twist_01_r",
+    "r_upperarmtwist1": "upperarm_twist_01_r",
+    "r_upperarmtwist2": "upperarm_twist_02_r",
+    "l_forearm_twist": "lowerarm_twist_01_l",
+    "l_forearmtwist1": "lowerarm_twist_01_l",
+    "l_forearmtwist2": "lowerarm_twist_02_l",
+    "r_forearm_twist": "lowerarm_twist_01_r",
+    "r_forearmtwist1": "lowerarm_twist_01_r",
+    "r_forearmtwist2": "lowerarm_twist_02_r",
+
+    # Metacarpals
+    "l_indexmetacarpal": "indexmetacarpal_l",
+    "r_indexmetacarpal": "indexmetacarpal_r",
+    "l_midmetacarpal": "midmetacarpal_l",
+    "r_midmetacarpal": "midmetacarpal_r",
+    "l_ringmetacarpal": "ringmetacarpal_l",
+    "r_ringmetacarpal": "ringmetacarpal_r",
+    "l_pinkymetacarpal": "pinkymetacarpal_l",
+    "r_pinkymetacarpal": "pinkymetacarpal_r",
+
     # Left Hand Fingers
     "l_thumb1": "thumb_01_l",
     "l_thumb2": "thumb_02_l",
@@ -76,85 +107,171 @@ DAZ_TO_MASTER_MAP = {
     "r_pinky2": "pinky_02_r",
     "r_pinky3": "pinky_03_r",
 
-    # Twist Bones
-    "l_arm_twist": "upperarm_twist_01_l",
-    "l_upperarm_twist": "upperarm_twist_01_l",
-    "l_forearm_twist": "lowerarm_twist_01_l",
-    "r_arm_twist": "upperarm_twist_01_r",
-    "r_upperarm_twist": "upperarm_twist_01_r",
-    "r_forearm_twist": "lowerarm_twist_01_r",
+    # Legs & Leg Twists
+    "l_thigh": "thigh_l",
+    "r_thigh": "thigh_r",
+    "l_shin": "calf_l",
+    "r_shin": "calf_r",
+    "l_foot": "foot_l",
+    "r_foot": "foot_r",
+    "l_toes": "ball_l",
+    "r_toes": "ball_r",
     "l_thigh_twist": "thigh_twist_01_l",
     "r_thigh_twist": "thigh_twist_01_r",
+    "l_tightwist1": "thigh_twist_01_l",
+    "l_thightwist1": "thigh_twist_01_l",
+    "l_tightwist2": "thigh_twist_02_l",
+    "l_thightwist2": "thigh_twist_02_l",
+    "r_tightwist1": "thigh_twist_01_r",
+    "r_thightwist1": "thigh_twist_01_r",
+    "r_tightwist2": "thigh_twist_02_r",
+    "r_thightwist2": "thigh_twist_02_r",
+
+    # Toes
+    "l_bigtoe1": "bigtoe_01_l",
+    "l_bigtoe2": "bigtoe_02_l",
+    "r_bigtoe1": "bigtoe_01_r",
+    "r_bigtoe2": "bigtoe_02_r",
+    "l_indextoe1": "indextoe_01_l",
+    "l_indextoe2": "indextoe_02_l",
+    "r_indextoe1": "indextoe_01_r",
+    "r_indextoe2": "indextoe_02_r",
+    "l_midtoe1": "midtoe_01_l",
+    "l_midtoe2": "midtoe_02_l",
+    "r_midtoe1": "midtoe_01_r",
+    "r_midtoe2": "midtoe_02_r",
+    "l_ringtoe1": "ringtoe_01_l",
+    "l_ringtoe2": "ringtoe_02_l",
+    "r_ringtoe1": "ringtoe_01_r",
+    "r_ringtoe2": "ringtoe_02_r",
+    "l_pinkytoe1": "pinkytoe_01_l",
+    "l_pinkytoe2": "pinkytoe_02_l",
+    "r_pinkytoe1": "pinkytoe_01_r",
+    "r_pinkytoe2": "pinkytoe_02_r",
 }
 
 MASTER_SK_HIERARCHY = {
     # Top-Level Deformation Bone
     "pelvis": None,
     
-    # Spine
+    # Spine Chain
     "spine_01": "pelvis",
     "spine_02": "spine_01",
     "spine_03": "spine_02",
-    "neck_01": "spine_03",
-    "head": "neck_01",
+    "spine_04": "spine_03",
     
-    # Left Arm
-    "clavicle_l": "spine_03",
+    # Neck & Head (neck01 & clavicles are children of spine_04)
+    "neck01": "spine_04",
+    "neck02": "neck01",
+    "head": "neck02",
+
+    # Pectorals (children of spine_04)
+    "pectoral_l": "spine_04",
+    "pectoral_r": "spine_04",
+    
+    # Clavicles & Arms (children of spine_04)
+    "clavicle_l": "spine_04",
     "upperarm_l": "clavicle_l",
+    "upperarm_twist_01_l": "upperarm_l",
+    "upperarm_twist_02_l": "upperarm_twist_01_l",
     "lowerarm_l": "upperarm_l",
+    "lowerarm_twist_01_l": "lowerarm_l",
+    "lowerarm_twist_02_l": "lowerarm_twist_01_l",
     "hand_l": "lowerarm_l",
     
+    "clavicle_r": "spine_04",
+    "upperarm_r": "clavicle_r",
+    "upperarm_twist_01_r": "upperarm_r",
+    "upperarm_twist_02_r": "upperarm_twist_01_r",
+    "lowerarm_r": "upperarm_r",
+    "lowerarm_twist_01_r": "lowerarm_r",
+    "lowerarm_twist_02_r": "lowerarm_twist_01_r",
+    "hand_r": "lowerarm_r",
+    
+    # Metacarpals (children of hand_l / hand_r)
+    "indexmetacarpal_l": "hand_l",
+    "midmetacarpal_l": "hand_l",
+    "ringmetacarpal_l": "hand_l",
+    "pinkymetacarpal_l": "hand_l",
+
+    "indexmetacarpal_r": "hand_r",
+    "midmetacarpal_r": "hand_r",
+    "ringmetacarpal_r": "hand_r",
+    "pinkymetacarpal_r": "hand_r",
+
     # Left Hand Fingers
     "thumb_01_l": "hand_l",
     "thumb_02_l": "thumb_01_l",
     "thumb_03_l": "thumb_02_l",
-    "index_01_l": "hand_l",
+    "index_01_l": "indexmetacarpal_l",
     "index_02_l": "index_01_l",
     "index_03_l": "index_02_l",
-    "middle_01_l": "hand_l",
+    "middle_01_l": "midmetacarpal_l",
     "middle_02_l": "middle_01_l",
     "middle_03_l": "middle_02_l",
-    "ring_01_l": "hand_l",
+    "ring_01_l": "ringmetacarpal_l",
     "ring_02_l": "ring_01_l",
     "ring_03_l": "ring_02_l",
-    "pinky_01_l": "hand_l",
+    "pinky_01_l": "pinkymetacarpal_l",
     "pinky_02_l": "pinky_01_l",
     "pinky_03_l": "pinky_02_l",
-    
-    # Right Arm
-    "clavicle_r": "spine_03",
-    "upperarm_r": "clavicle_r",
-    "lowerarm_r": "upperarm_r",
-    "hand_r": "lowerarm_r",
     
     # Right Hand Fingers
     "thumb_01_r": "hand_r",
     "thumb_02_r": "thumb_01_r",
     "thumb_03_r": "thumb_02_r",
-    "index_01_r": "hand_r",
+    "index_01_r": "indexmetacarpal_r",
     "index_02_r": "index_01_r",
     "index_03_r": "index_02_r",
-    "middle_01_r": "hand_r",
+    "middle_01_r": "midmetacarpal_r",
     "middle_02_r": "middle_01_r",
     "middle_03_r": "middle_02_r",
-    "ring_01_r": "hand_r",
+    "ring_01_r": "ringmetacarpal_r",
     "ring_02_r": "ring_01_r",
     "ring_03_r": "ring_02_r",
-    "pinky_01_r": "hand_r",
+    "pinky_01_r": "pinkymetacarpal_r",
     "pinky_02_r": "pinky_01_r",
     "pinky_03_r": "pinky_02_r",
     
-    # Legs
+    # Legs & Leg Twists
     "thigh_l": "pelvis",
+    "thigh_twist_01_l": "thigh_l",
+    "thigh_twist_02_l": "thigh_twist_01_l",
     "calf_l": "thigh_l",
     "foot_l": "calf_l",
     "ball_l": "foot_l",
     
     "thigh_r": "pelvis",
+    "thigh_twist_01_r": "thigh_r",
+    "thigh_twist_02_r": "thigh_twist_01_r",
     "calf_r": "thigh_r",
     "foot_r": "calf_r",
     "ball_r": "foot_r",
     
+    # Toes (Left)
+    "bigtoe_01_l": "ball_l",
+    "bigtoe_02_l": "bigtoe_01_l",
+    "indextoe_01_l": "ball_l",
+    "indextoe_02_l": "indextoe_01_l",
+    "midtoe_01_l": "ball_l",
+    "midtoe_02_l": "midtoe_01_l",
+    "ringtoe_01_l": "ball_l",
+    "ringtoe_02_l": "ringtoe_01_l",
+    "pinkytoe_01_l": "ball_l",
+    "pinkytoe_02_l": "pinkytoe_01_l",
+
+    # Toes (Right)
+    "bigtoe_01_r": "ball_r",
+    "bigtoe_02_r": "bigtoe_01_r",
+    "indextoe_01_r": "ball_r",
+    "indextoe_02_r": "indextoe_01_r",
+    "midtoe_01_r": "ball_r",
+    "midtoe_02_r": "midtoe_01_r",
+    "ringtoe_01_r": "ball_r",
+    "ringtoe_02_r": "ringtoe_01_r",
+    "pinkytoe_01_r": "ball_r",
+    "pinkytoe_02_r": "pinkytoe_01_r",
+
     # Top-Level IK Roots
     "ik_foot_root": None,
     "ik_foot_l": "ik_foot_root",

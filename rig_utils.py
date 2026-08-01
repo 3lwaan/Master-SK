@@ -112,7 +112,6 @@ def rename_armature_and_datablock(armature_obj, mesh_objs):
             target_obj_name = mesh_name
         armature_obj.name = target_obj_name
 
-    # Rename armature data block directly to 'root'
     armature_obj.data.name = "root"
 
 
@@ -132,8 +131,10 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     Step 2 Rig Processing (Edit Mode):
     - Purges extra physical 'root' bone, anchor bones, and driven bones (*(drv)*).
     - Resolves 'pelvis_temp_conflict': deletes pre-existing helper 'pelvis' or 'root' bones first before renaming 'hip' -> 'pelvis'.
-    - Restructures hierarchy: top-level bone is 'pelvis' (parent is None).
-    - Parents spine_01, thigh_l, thigh_r directly to pelvis.
+    - Restructures hierarchy per MASTER_SK_HIERARCHY:
+      - Top-level bone is 'pelvis' (parent is None).
+      - spine_04 is parent of neck01, clavicle_l, clavicle_r, pectoral_l, pectoral_r.
+      - Metacarpals are parented to hand_l/hand_r, and finger 01 bones parented to metacarpals.
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
     hierarchy = reference_data.get("MASTER_SK_HIERARCHY", {})
@@ -149,58 +150,37 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
             b_name = eb.name
             b_name_lower = b_name.lower()
             
-            # Check explicit list or driven pattern
             if b_name in explicit_delete or b_name_lower in ["root", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"]:
                 edit_bones.remove(eb)
             elif "(drv)" in b_name_lower or fnmatch.fnmatch(b_name_lower, "*(drv)*"):
                 edit_bones.remove(eb)
 
         # 2. Resolve pelvis_temp_conflict:
-        # If 'hip' exists and an old helper 'pelvis' bone also exists in edit_bones, remove the helper 'pelvis' bone first!
         hip_bone = edit_bones.get("hip")
         pre_pelvis = edit_bones.get("pelvis")
         
         if hip_bone and pre_pelvis and pre_pelvis != hip_bone:
-            # Delete pre-existing pelvis helper bone so hip renames cleanly to 'pelvis'
             edit_bones.remove(pre_pelvis)
 
-        # 3. Cleanly rename 'hip' to 'pelvis'
         if hip_bone:
             hip_bone.name = "pelvis"
 
-        # 4. Perform bone mapping & renaming for remaining bones
-        # Make sure no name conflicts occur
-        bone_name_lookup = {}
+        # 3. Perform bone mapping & renaming for remaining bones cleanly
         for eb in list(edit_bones):
             orig_name = eb.name
             if orig_name in daz_map:
                 target_name = daz_map[orig_name]
                 if orig_name != target_name:
-                    # If target_name already exists and is a different bone, delete the old conflicting bone
                     if target_name in edit_bones and edit_bones[target_name] != eb:
                         edit_bones.remove(edit_bones[target_name])
                     eb.name = target_name
-            bone_name_lookup[eb.name] = eb
 
-        # 5. Enforce Top-Level Hierarchy Rules
-        # 'pelvis' is the top-level deformation bone; parent MUST be None
+        # 4. Enforce Top-Level Hierarchy Rules
         pelvis_eb = edit_bones.get("pelvis")
         if pelvis_eb:
             pelvis_eb.parent = None
 
-        spine1_eb = edit_bones.get("spine_01") or edit_bones.get("spine1")
-        thigh_l_eb = edit_bones.get("thigh_l") or edit_bones.get("l_thigh")
-        thigh_r_eb = edit_bones.get("thigh_r") or edit_bones.get("r_thigh")
-
-        if pelvis_eb:
-            if spine1_eb and spine1_eb != pelvis_eb:
-                spine1_eb.parent = pelvis_eb
-            if thigh_l_eb and thigh_l_eb != pelvis_eb:
-                thigh_l_eb.parent = pelvis_eb
-            if thigh_r_eb and thigh_r_eb != pelvis_eb:
-                thigh_r_eb.parent = pelvis_eb
-
-        # 6. Restructure remaining bones according to MASTER_SK_HIERARCHY
+        # 5. Restructure remaining bones according to MASTER_SK_HIERARCHY with fallback handling
         for child_target, parent_target in hierarchy.items():
             child_eb = edit_bones.get(child_target)
             if child_eb:
@@ -208,6 +188,22 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                     child_eb.parent = None
                 else:
                     parent_eb = edit_bones.get(parent_target)
+                    
+                    # Smart fallbacks if specific optional parent bone is absent
+                    if not parent_eb:
+                        if parent_target.startswith("indexmetacarpal"):
+                            parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
+                        elif parent_target.startswith("midmetacarpal"):
+                            parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
+                        elif parent_target.startswith("ringmetacarpal"):
+                            parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
+                        elif parent_target.startswith("pinkymetacarpal"):
+                            parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
+                        elif parent_target == "neck02":
+                            parent_eb = edit_bones.get("neck01")
+                        elif parent_target == "spine_04":
+                            parent_eb = edit_bones.get("spine_03")
+
                     if parent_eb and parent_eb != child_eb:
                         child_eb.parent = parent_eb
 
