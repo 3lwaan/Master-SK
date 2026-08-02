@@ -210,6 +210,102 @@ def merge_hip_weights_to_pelvis(mesh_objs):
             print(f"[MasterSK] Could not remove hip vertex group: {e}")
 
 
+def is_child_toe_bone(b_name):
+    """Returns True for any of the 20 individual child toe bones (DAZ or UE5 names) while retaining toes_l/r / l_toes/r_toes."""
+    name_lower = b_name.lower()
+    if name_lower in ["toes_l", "toes_r", "l_toes", "r_toes", "ltoe", "rtoe", "ball_l", "ball_r"]:
+        return False
+
+    toe_keywords = ["bigtoe", "indextoe", "midtoe", "ringtoe", "pinkytoe", "pinkeytoe"]
+    for kw in toe_keywords:
+        if kw in name_lower:
+            return True
+
+    if "toe" in name_lower and name_lower not in ["toes_l", "toes_r", "l_toes", "r_toes", "ltoe", "rtoe", "ball_l", "ball_r"]:
+        return True
+
+    return False
+
+
+def merge_child_toe_weights_to_toes(mesh_objs):
+    """
+    Merges all 20 child toe vertex weights into 'toes_l' and 'toes_r' before deleting child toe bones,
+    preventing toe mesh tips from losing skin deformation.
+    """
+    for mesh_obj in mesh_objs:
+        if not mesh_obj or mesh_obj.type != 'MESH':
+            continue
+
+        vgroups = mesh_obj.vertex_groups
+        
+        # 1. Ensure destination groups exist or rename if named l_toes/ball_l/etc.
+        toes_l_vg = vgroups.get("toes_l") or vgroups.get("l_toes") or vgroups.get("ltoe") or vgroups.get("ball_l")
+        if toes_l_vg and toes_l_vg.name != "toes_l":
+            toes_l_vg.name = "toes_l"
+        elif not toes_l_vg:
+            toes_l_vg = vgroups.new(name="toes_l")
+
+        toes_r_vg = vgroups.get("toes_r") or vgroups.get("r_toes") or vgroups.get("rtoe") or vgroups.get("ball_r")
+        if toes_r_vg and toes_r_vg.name != "toes_r":
+            toes_r_vg.name = "toes_r"
+        elif not toes_r_vg:
+            toes_r_vg = vgroups.new(name="toes_r")
+
+        # 2. Collect left and right child toe vertex groups
+        left_toe_vgs = []
+        right_toe_vgs = []
+
+        for vg in list(vgroups):
+            name_lower = vg.name.lower()
+            if name_lower in ["toes_l", "toes_r", "l_toes", "r_toes", "ltoe", "rtoe", "ball_l", "ball_r"]:
+                continue
+            if is_child_toe_bone(vg.name):
+                if name_lower.endswith("_l") or name_lower.startswith("l_") or "left" in name_lower or name_lower.endswith("1_l") or name_lower.endswith("2_l"):
+                    left_toe_vgs.append(vg)
+                elif name_lower.endswith("_r") or name_lower.startswith("r_") or "right" in name_lower or name_lower.endswith("1_r") or name_lower.endswith("2_r"):
+                    right_toe_vgs.append(vg)
+
+        left_indices = {vg.index for vg in left_toe_vgs}
+        right_indices = {vg.index for vg in right_toe_vgs}
+
+        if not left_indices and not right_indices:
+            continue
+
+        # 3. Sum weights per vertex and add to toes_l / toes_r
+        mesh_data = mesh_obj.data
+        for v in mesh_data.vertices:
+            left_sum = 0.0
+            right_sum = 0.0
+            existing_l = 0.0
+            existing_r = 0.0
+
+            for g in v.groups:
+                if g.group == toes_l_vg.index:
+                    existing_l = g.weight
+                elif g.group == toes_r_vg.index:
+                    existing_r = g.weight
+
+                if g.group in left_indices:
+                    left_sum += g.weight
+                elif g.group in right_indices:
+                    right_sum += g.weight
+
+            if left_sum > 0.0:
+                new_w = min(1.0, existing_l + left_sum)
+                toes_l_vg.add([v.index], new_w, 'REPLACE')
+
+            if right_sum > 0.0:
+                new_w = min(1.0, existing_r + right_sum)
+                toes_r_vg.add([v.index], new_w, 'REPLACE')
+
+        # 4. Safely remove old child toe vertex groups
+        for vg in left_toe_vgs + right_toe_vgs:
+            try:
+                vgroups.remove(vg)
+            except Exception as e:
+                print(f"[MasterSK] Could not remove toe vertex group '{vg.name}': {e}")
+
+
 def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     """
     Step 2 Rig Processing (Edit Mode):
@@ -229,7 +325,7 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
             b_name = eb.name
             b_name_lower = b_name.lower()
             
-            if b_name in explicit_delete or b_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"]:
+            if b_name in explicit_delete or b_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or is_child_toe_bone(b_name):
                 edit_bones.remove(eb)
             elif "(drv)" in b_name_lower or fnmatch.fnmatch(b_name_lower, "*(drv)*"):
                 edit_bones.remove(eb)
@@ -297,6 +393,7 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
             is_deleted = (
                 vg_name in deleted_names or
                 vg_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
+                is_child_toe_bone(vg_name) or
                 "(drv)" in vg_name_lower or
                 fnmatch.fnmatch(vg_name_lower, "*(drv)*")
             )
@@ -542,6 +639,7 @@ def prune_face_rig_bones(face_armature_obj):
     allowed_anchor_bones = {
         "root", "pelvis", "spine_01", "spine_02", "spine_03", "spine_04",
         "pectoral_l", "pectoral_r", "clavicle_l", "upperarm_l", "clavicle_r", "upperarm_r",
+        "upperarm_twist_01_l", "upperarm_twist_01_r", "l_upperarm_twist", "r_upperarm_twist", "l_arm_twist", "r_arm_twist",
         "neck01", "neck02", "head"
     }
 

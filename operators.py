@@ -8,6 +8,7 @@ from .rig_utils import (
     clear_pelvis_constraints,
     rename_uv_layers,
     merge_hip_weights_to_pelvis,
+    merge_child_toe_weights_to_toes,
     purge_bones_and_restructure_hierarchy,
     sync_bone_and_vertex_group_names,
     inject_ue5_als_ik_bones,
@@ -83,7 +84,10 @@ class MSK_OT_process_rig_vertex_groups(bpy.types.Operator):
             # 5. Merge vertex weights from 'hip' into 'pelvis' before purging hip bone to prevent skinning bugs
             merge_hip_weights_to_pelvis(mesh_objs)
 
-            # 6. Bone Purge (including 20 child toe bones) & Hierarchy Restructuring
+            # 6. Merge 20 child toe weights into 'toes_l' and 'toes_r' before purging child toe bones
+            merge_child_toe_weights_to_toes(mesh_objs)
+
+            # 7. Bone Purge (including 20 child toe bones) & Hierarchy Restructuring
             purge_bones_and_restructure_hierarchy(armature_obj, ref_data)
 
             # 7. Synchronized Vertex Group Renaming & Cleanup

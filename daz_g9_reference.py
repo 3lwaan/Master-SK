@@ -106,15 +106,19 @@ DAZ_TO_MASTER_MAP = {
     "r_pinky2": "pinky_02_r",
     "r_pinky3": "pinky_03_r",
 
-    # Legs & Leg Twists
+    # Legs, Feet & Toes
     "l_thigh": "thigh_l",
     "r_thigh": "thigh_r",
     "l_shin": "calf_l",
     "r_shin": "calf_r",
     "l_foot": "foot_l",
     "r_foot": "foot_r",
-    "l_toes": "ball_l",
-    "r_toes": "ball_r",
+    "l_toes": "toes_l",
+    "r_toes": "toes_r",
+    "ltoe": "toes_l",
+    "rtoe": "toes_r",
+    "ball_l": "toes_l",
+    "ball_r": "toes_r",
     "l_thigh_twist": "thigh_twist_01_l",
     "r_thigh_twist": "thigh_twist_01_r",
     "l_tightwist1": "thigh_twist_01_l",
@@ -143,14 +147,14 @@ MASTER_SK_HIERARCHY = {
     "thigh_twist_02_l": "thigh_twist_01_l",
     "calf_l": "thigh_l",
     "foot_l": "calf_l",
-    "ball_l": "foot_l",
+    "toes_l": "foot_l",
     
     "thigh_r": "pelvis",
     "thigh_twist_01_r": "thigh_r",
     "thigh_twist_02_r": "thigh_twist_01_r",
     "calf_r": "thigh_r",
     "foot_r": "calf_r",
-    "ball_r": "foot_r",
+    "toes_r": "foot_r",
     
     # Pectorals (parented to spine_03)
     "pectoral_l": "spine_03",
@@ -242,14 +246,20 @@ BONES_TO_DELETE = [
     "r_hand_anchor",
     "l_foot_anchor",
     "r_foot_anchor",
-    # 20 Individual Child Toe Bones (Left Foot)
+    # 20 Individual DAZ & Master SK Child Toe Bones (Left Foot)
+    "l_bigtoe1", "l_bigtoe2", "l_indextoe1", "l_indextoe2",
+    "l_midtoe1", "l_midtoe2", "l_ringtoe1", "l_ringtoe2",
+    "l_pinkytoe1", "l_pinkytoe2", "l_pinkeytoe2",
     "bigtoe01_l", "bigtoe02_l", "indextoe01_l", "indextoe02_l",
     "midtoe01_l", "midtoe02_l", "ringtoe01_l", "ringtoe02_l",
     "pinkytoe01_l", "pinkytoe02_l", "pinkeytoe02_l",
     "bigtoe_01_l", "bigtoe_02_l", "indextoe_01_l", "indextoe_02_l",
     "midtoe_01_l", "midtoe_02_l", "ringtoe_01_l", "ringtoe_02_l",
     "pinkytoe_01_l", "pinkytoe_02_l", "pinkeytoe_02_l",
-    # 20 Individual Child Toe Bones (Right Foot)
+    # 20 Individual DAZ & Master SK Child Toe Bones (Right Foot)
+    "r_bigtoe1", "r_bigtoe2", "r_indextoe1", "r_indextoe2",
+    "r_midtoe1", "r_midtoe2", "r_ringtoe1", "r_ringtoe2",
+    "r_pinkytoe1", "r_pinkytoe2", "r_pinkeytoe2",
     "bigtoe01_r", "bigtoe02_r", "indextoe01_r", "indextoe02_r",
     "midtoe01_r", "midtoe02_r", "ringtoe01_r", "ringtoe02_r",
     "pinkytoe01_r", "pinkytoe02_r", "pinkeytoe02_r",
