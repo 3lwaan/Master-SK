@@ -1,6 +1,7 @@
 import bpy
 from .reference_loader import load_reference_data
 from .rig_utils import (
+    add_audit_log_entry,
     validate_selection,
     apply_transforms,
     rename_armature_and_datablock,
@@ -9,13 +10,18 @@ from .rig_utils import (
     rename_uv_layers,
     merge_hip_weights_to_pelvis,
     merge_child_toe_weights_to_toes,
+    merge_metacarpal_weights_to_hands,
     purge_bones_and_restructure_hierarchy,
     sync_bone_and_vertex_group_names,
     inject_ue5_als_ik_bones,
+    consolidate_pre_split_materials,
     separate_head_mesh_by_material,
     prune_face_rig_bones,
     prune_body_rig_bones,
     purge_orphaned_vgroups_for_split,
+    join_head_and_facial_meshes,
+    consolidate_post_join_head_materials,
+    audit_final_material_slots,
 )
 
 class MSK_OT_prepare_character(bpy.types.Operator):
@@ -31,27 +37,35 @@ class MSK_OT_prepare_character(bpy.types.Operator):
         if not armature_obj or not mesh_objs:
             self.report({'ERROR'}, 'Please select both the DAZ Armature and Character Mesh.')
             props.status_message = "Error: Please select both the DAZ Armature and Character Mesh."
+            add_audit_log_entry(context, "Step 1", "Failed selection validation.", "ERROR", "ERROR")
             return {'CANCELLED'}
 
         try:
             apply_transforms(armature_obj, mesh_objs)
             
+            # Auto-populate target dropdown selectors
+            props.target_body_armature = armature_obj
+            props.target_body_mesh = mesh_objs[0]
+
             props.active_armature_name = armature_obj.name
             props.step1_completed = True
-            props.status_message = f"Step 1 Complete: Applied transforms for '{armature_obj.name}' and {len(mesh_objs)} mesh(es)."
+            msg = f"Step 1 Complete: Applied transforms for '{armature_obj.name}' and {len(mesh_objs)} mesh(es)."
+            props.status_message = msg
             
-            self.report({'INFO'}, f"Transforms cleanly applied for '{armature_obj.name}' and character mesh(es).")
+            add_audit_log_entry(context, "Step 1", f"Transforms applied for '{armature_obj.name}' and {len(mesh_objs)} mesh(es). Targets set.", "SUCCESS", "CHECKMARK")
+            self.report({'INFO'}, msg)
             return {'FINISHED'}
             
         except Exception as e:
             err_text = f"Failed to prepare character: {str(e)}"
             self.report({'ERROR'}, err_text)
             props.status_message = f"Error: {err_text}"
+            add_audit_log_entry(context, "Step 1", err_text, "ERROR", "ERROR")
             return {'CANCELLED'}
 
 
 class MSK_OT_process_rig_vertex_groups(bpy.types.Operator):
-    """Purge helper bones, restructure hierarchy to UE5 standard, clean pelvis constraints, rename UV layers, and sync vertex groups."""
+    """Purge helper/toe/metacarpal bones, restructure hierarchy to UE5 standard, clean pelvis constraints, rename UV layers, and sync vertex groups."""
     bl_idname = "master_sk.process_rig_vertex_groups"
     bl_label = "2. Process Rig & Sync Vertex Groups"
     bl_options = {'REGISTER', 'UNDO'}
@@ -63,6 +77,7 @@ class MSK_OT_process_rig_vertex_groups(bpy.types.Operator):
         if not armature_obj or not mesh_objs:
             self.report({'ERROR'}, err_msg or "Please select both the DAZ Armature and Character Mesh.")
             props.status_message = "Error: Selection invalid for Step 2."
+            add_audit_log_entry(context, "Step 2", "Selection invalid for Step 2.", "ERROR", "ERROR")
             return {'CANCELLED'}
 
         try:
@@ -84,25 +99,31 @@ class MSK_OT_process_rig_vertex_groups(bpy.types.Operator):
             # 5. Merge vertex weights from 'hip' into 'pelvis' before purging hip bone to prevent skinning bugs
             merge_hip_weights_to_pelvis(mesh_objs)
 
-            # 6. Merge 20 child toe weights into 'toes_l' and 'toes_r' before purging child toe bones
+            # 6. Merge 20 child toe weights into 'toes_l' and 'toes_r'
             merge_child_toe_weights_to_toes(mesh_objs)
 
-            # 7. Bone Purge (including 20 child toe bones) & Hierarchy Restructuring
-            purge_bones_and_restructure_hierarchy(armature_obj, ref_data)
+            # 7. Merge 8 metacarpal weights into 'hand_l' and 'hand_r'
+            meta_verts, meta_vgs = merge_metacarpal_weights_to_hands(mesh_objs)
 
-            # 7. Synchronized Vertex Group Renaming & Cleanup
+            # 8. Bone Purge (including 20 child toe bones & 8 metacarpal bones) & Hierarchy Restructuring
+            deleted_count = purge_bones_and_restructure_hierarchy(armature_obj, ref_data)
+
+            # 9. Synchronized Vertex Group Renaming & Cleanup
             sync_bone_and_vertex_group_names(armature_obj, mesh_objs, ref_data)
 
             props.step2_completed = True
-            props.status_message = f"Step 2 Complete: Restructured '{armature_obj.name}', cleaned pelvis constraints & UVMap."
+            msg = f"Step 2 Complete: Restructured '{armature_obj.name}', purged {deleted_count} bones & transferred metacarpal/toe weights."
+            props.status_message = msg
             
-            self.report({'INFO'}, f"Rig hierarchy restructured, pelvis constraints cleared, UV map renamed, and weights synced.")
+            add_audit_log_entry(context, "Step 2", f"Purged {deleted_count} bones; transferred {meta_verts} metacarpal vertex weights to hand_l/r.", "SUCCESS", "CHECKMARK")
+            self.report({'INFO'}, msg)
             return {'FINISHED'}
 
         except Exception as e:
             err_text = f"Error processing rig & vertex groups: {str(e)}"
             self.report({'ERROR'}, err_text)
             props.status_message = f"Error: {err_text}"
+            add_audit_log_entry(context, "Step 2", err_text, "ERROR", "ERROR")
             return {'CANCELLED'}
 
 
@@ -119,26 +140,30 @@ class MSK_OT_inject_ik_bones(bpy.types.Operator):
         if not armature_obj:
             self.report({'ERROR'}, "Please select the target Master SK Armature.")
             props.status_message = "Error: Armature selection invalid for Step 3."
+            add_audit_log_entry(context, "Step 3", "Armature selection invalid for Step 3.", "ERROR", "ERROR")
             return {'CANCELLED'}
 
         try:
             inject_ue5_als_ik_bones(armature_obj)
 
             props.step3_completed = True
-            props.status_message = f"Step 3 Complete: Injected UE5/ALS IK bones for '{armature_obj.name}'."
+            msg = f"Step 3 Complete: Injected UE5/ALS IK bones for '{armature_obj.name}'."
+            props.status_message = msg
             
-            self.report({'INFO'}, f"UE5 / ALS IK bones successfully injected into '{armature_obj.name}'.")
+            add_audit_log_entry(context, "Step 3", f"Injected ik_foot_root, ik_hand_root, ik_foot_l/r, ik_hand_l/r into '{armature_obj.name}'.", "SUCCESS", "CHECKMARK")
+            self.report({'INFO'}, msg)
             return {'FINISHED'}
 
         except Exception as e:
             err_text = f"Error injecting IK bones: {str(e)}"
             self.report({'ERROR'}, err_text)
             props.status_message = f"Error: {err_text}"
+            add_audit_log_entry(context, "Step 3", err_text, "ERROR", "ERROR")
             return {'CANCELLED'}
 
 
 class MSK_OT_separate_head_modularize(bpy.types.Operator):
-    """Separate head geometry via 'Head' material slot, split armatures into SKM_Body_Rig and SKM_Face_Rig, and purge orphaned weights."""
+    """Consolidate pre-split materials, separate head geometry, split armatures into SKM_Body_Rig and SKM_Face_Rig, and purge orphaned weights."""
     bl_idname = "master_sk.separate_head_modularize"
     bl_label = "4. Separate Head & Modularize Rigs"
     bl_options = {'REGISTER', 'UNDO'}
@@ -150,23 +175,29 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
         if not armature_obj or not mesh_objs:
             self.report({'ERROR'}, "Please select the Master SK Armature and Character Mesh.")
             props.status_message = "Error: Selection invalid for Step 4."
+            add_audit_log_entry(context, "Step 4", "Selection invalid for Step 4.", "ERROR", "ERROR")
             return {'CANCELLED'}
 
         target_mesh = mesh_objs[0]
 
         try:
+            # Step 4.0: Consolidate Pre-Split Material Slots (Mouth Cavity -> Head, Nails -> Arms)
+            pre_split_mat_logs = consolidate_pre_split_materials(target_mesh)
+            if pre_split_mat_logs:
+                add_audit_log_entry(context, "Step 4", pre_split_mat_logs, "INFO", "INFO")
+
             # Step 4.1: Separate Head Mesh via Material Slot
             head_mesh, body_mesh, sep_err = separate_head_mesh_by_material(target_mesh)
             if sep_err:
                 self.report({'ERROR'}, sep_err)
                 props.status_message = f"Error: {sep_err}"
+                add_audit_log_entry(context, "Step 4", sep_err, "ERROR", "ERROR")
                 return {'CANCELLED'}
 
             # Step 4.2: Duplicate Armature to create SKM_Body_Rig and SKM_Face_Rig
             body_rig = armature_obj
             body_rig.name = "SKM_Body_Rig"
 
-            # Duplicate body_rig in Object mode
             bpy.ops.object.select_all(action='DESELECT')
             body_rig.select_set(True)
             bpy.context.view_layer.objects.active = body_rig
@@ -177,7 +208,6 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
             # Step 4.3: Prune SKM_Face_Rig & setup SKM_Head_Mesh
             prune_face_rig_bones(face_rig)
             
-            # Re-target Armature Modifier on SKM_Head_Mesh
             for mod in list(head_mesh.modifiers):
                 if mod.type == 'ARMATURE':
                     mod.object = face_rig
@@ -187,27 +217,94 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
             # Step 4.4: Prune SKM_Body_Rig & setup SKM_Body_Mesh
             prune_body_rig_bones(body_rig)
             
-            # Re-target Armature Modifier on SKM_Body_Mesh
             for mod in list(body_mesh.modifiers):
                 if mod.type == 'ARMATURE':
                     mod.object = body_rig
 
             purge_orphaned_vgroups_for_split(body_mesh, body_rig)
 
-            # Parent mesh objects under respective rigs cleanly
             head_mesh.parent = face_rig
             body_mesh.parent = body_rig
 
+            # Auto-fill target pointers for Step 5
+            props.target_head_armature = face_rig
+            props.target_head_mesh = head_mesh
+
             props.step4_completed = True
-            props.status_message = "Step 4 Complete: Modularized into 'SKM_Body_Rig' & 'SKM_Face_Rig'."
+            msg = "Step 4 Complete: Separated head & created 'SKM_Body_Rig' & 'SKM_Face_Rig'."
+            props.status_message = msg
             
-            self.report({'INFO'}, "Successfully separated head mesh and modularized Body & Face rigs.")
+            add_audit_log_entry(context, "Step 4", f"Separated SKM_Head_Mesh and SKM_Body_Mesh; pruned SKM_Face_Rig & SKM_Body_Rig.", "SUCCESS", "CHECKMARK")
+            self.report({'INFO'}, msg)
             return {'FINISHED'}
 
         except Exception as e:
             err_text = f"Error modularizing head & rigs: {str(e)}"
             self.report({'ERROR'}, err_text)
             props.status_message = f"Error: {err_text}"
+            add_audit_log_entry(context, "Step 4", err_text, "ERROR", "ERROR")
+            return {'CANCELLED'}
+
+
+class MSK_OT_join_facial_meshes(bpy.types.Operator):
+    """Standardise UV maps across head/facial meshes, join into SKM_Head_Mesh, and consolidate Teeth -> Mouth and EyeMoisture -> Eyes."""
+    bl_idname = "master_sk.join_facial_meshes"
+    bl_label = "5. Join Facial Meshes & Finalize Head"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.master_sk_props
+
+        # Resolve Head Mesh
+        head_mesh = props.target_head_mesh or bpy.data.objects.get("SKM_Head_Mesh")
+        body_mesh = props.target_body_mesh or bpy.data.objects.get("SKM_Body_Mesh")
+
+        if not head_mesh or head_mesh.type != 'MESH':
+            self.report({'ERROR'}, "Target SKM_Head_Mesh not found or invalid.")
+            props.status_message = "Error: Target SKM_Head_Mesh invalid."
+            add_audit_log_entry(context, "Step 5", "Target SKM_Head_Mesh invalid.", "ERROR", "ERROR")
+            return {'CANCELLED'}
+
+        try:
+            # Collect external facial meshes from properties or search fallback
+            facial_objs = []
+            for prop_obj in [props.target_eyes_mesh, props.target_eyelashes_mesh, props.target_mouth_mesh]:
+                if prop_obj and prop_obj.name in bpy.data.objects and prop_obj != head_mesh:
+                    facial_objs.append(prop_obj)
+
+            if not facial_objs:
+                # Search scene for unjoined facial meshes
+                for obj in bpy.data.objects:
+                    if obj.type == 'MESH' and obj != head_mesh and obj != body_mesh:
+                        oname = obj.name.lower()
+                        if any(k in oname for k in ["eye", "eyelash", "mouth", "teeth"]):
+                            facial_objs.append(obj)
+
+            # Step 5.1 & 5.2: UV Standardisation & Joining
+            success, join_msg = join_head_and_facial_meshes(head_mesh, facial_objs)
+            add_audit_log_entry(context, "Step 5", join_msg, "INFO", "INFO")
+
+            # Step 5.3: Post-Join Material Consolidation (Teeth -> Mouth, EyeMoisture -> Eyes)
+            post_mat_logs = consolidate_post_join_head_materials(head_mesh)
+            if post_mat_logs:
+                add_audit_log_entry(context, "Step 5", post_mat_logs, "INFO", "INFO")
+
+            # Step 5.4: Final Material Slot Audit
+            slot_audit_text = audit_final_material_slots(head_mesh, body_mesh)
+            add_audit_log_entry(context, "Step 5", slot_audit_text, "SUCCESS", "CHECKMARK")
+
+            props.step5_completed = True
+            msg = "Step 5 Complete: Joined facial meshes & consolidated head materials."
+            props.status_message = msg
+            
+            self.report({'INFO'}, msg)
+            return {'FINISHED'}
+
+        except Exception as e:
+            err_text = f"Error joining facial meshes & consolidating materials: {str(e)}"
+            self.report({'ERROR'}, err_text)
+            props.status_message = f"Error: {err_text}"
+            add_audit_log_entry(context, "Step 5", err_text, "ERROR", "ERROR")
             return {'CANCELLED'}
 
 
@@ -225,13 +322,15 @@ class MSK_OT_reload_reference(bpy.types.Operator):
         source_name = ref_data.get("source", "Unknown")
         num_mappings = len(ref_data.get("DAZ_TO_MASTER_MAP", {}))
         
-        self.report({'INFO'}, f"Loaded reference file from '{source_name}' ({num_mappings} bone mappings).")
+        msg = f"Loaded reference file from '{source_name}' ({num_mappings} bone mappings)."
+        self.report({'INFO'}, msg)
         props.status_message = f"Reference File Loaded: {source_name}"
+        add_audit_log_entry(context, "Ref", msg, "INFO", "FILE_REFRESH")
         return {'FINISHED'}
 
 
 class MSK_OT_reset_progress(bpy.types.Operator):
-    """Reset step completion checkmarks and status message."""
+    """Reset step completion checkmarks, audit log, and status message."""
     bl_idname = "master_sk.reset_progress"
     bl_label = "Reset Step Progress"
     bl_options = {'REGISTER'}
@@ -242,8 +341,13 @@ class MSK_OT_reset_progress(bpy.types.Operator):
         props.step2_completed = False
         props.step3_completed = False
         props.step4_completed = False
+        props.step5_completed = False
         props.status_message = "Ready. Select your DAZ Armature and Character Mesh to begin."
-        self.report({'INFO'}, "Master SK workflow progress reset.")
+
+        if hasattr(context.scene, "master_sk_audit_log"):
+            context.scene.master_sk_audit_log.clear()
+
+        self.report({'INFO'}, "Master SK workflow progress & audit log reset.")
         return {'FINISHED'}
 
 
@@ -252,6 +356,7 @@ classes = (
     MSK_OT_process_rig_vertex_groups,
     MSK_OT_inject_ik_bones,
     MSK_OT_separate_head_modularize,
+    MSK_OT_join_facial_meshes,
     MSK_OT_reload_reference,
     MSK_OT_reset_progress,
 )

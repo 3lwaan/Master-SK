@@ -62,17 +62,7 @@ DAZ_TO_MASTER_MAP = {
     "r_forearmtwist1": "lowerarm_twist_01_r",
     "r_forearmtwist2": "lowerarm_twist_02_r",
 
-    # Metacarpals
-    "l_indexmetacarpal": "indexmetacarpal_l",
-    "r_indexmetacarpal": "indexmetacarpal_r",
-    "l_midmetacarpal": "midmetacarpal_l",
-    "r_midmetacarpal": "midmetacarpal_r",
-    "l_ringmetacarpal": "ringmetacarpal_l",
-    "r_ringmetacarpal": "ringmetacarpal_r",
-    "l_pinkymetacarpal": "pinkymetacarpal_l",
-    "r_pinkymetacarpal": "pinkymetacarpal_r",
-
-    # Left Hand Fingers
+    # Left Hand Fingers (Finger 01 bones parented directly to hand_l)
     "l_thumb1": "thumb_01_l",
     "l_thumb2": "thumb_02_l",
     "l_thumb3": "thumb_03_l",
@@ -89,7 +79,7 @@ DAZ_TO_MASTER_MAP = {
     "l_pinky2": "pinky_02_l",
     "l_pinky3": "pinky_03_l",
 
-    # Right Hand Fingers
+    # Right Hand Fingers (Finger 01 bones parented directly to hand_r)
     "r_thumb1": "thumb_01_r",
     "r_thumb2": "thumb_02_r",
     "r_thumb3": "thumb_03_r",
@@ -183,49 +173,38 @@ MASTER_SK_HIERARCHY = {
     "lowerarm_twist_01_r": "lowerarm_r",
     "lowerarm_twist_02_r": "lowerarm_twist_01_r",
     "hand_r": "lowerarm_r",
-    
-    # Metacarpals (children of hand_l / hand_r)
-    "indexmetacarpal_l": "hand_l",
-    "midmetacarpal_l": "hand_l",
-    "ringmetacarpal_l": "hand_l",
-    "pinkymetacarpal_l": "hand_l",
 
-    "indexmetacarpal_r": "hand_r",
-    "midmetacarpal_r": "hand_r",
-    "ringmetacarpal_r": "hand_r",
-    "pinkymetacarpal_r": "hand_r",
-
-    # Left Hand Fingers
+    # Left Hand Fingers (parented directly to hand_l)
     "thumb_01_l": "hand_l",
     "thumb_02_l": "thumb_01_l",
     "thumb_03_l": "thumb_02_l",
-    "index_01_l": "indexmetacarpal_l",
+    "index_01_l": "hand_l",
     "index_02_l": "index_01_l",
     "index_03_l": "index_02_l",
-    "middle_01_l": "midmetacarpal_l",
+    "middle_01_l": "hand_l",
     "middle_02_l": "middle_01_l",
     "middle_03_l": "middle_02_l",
-    "ring_01_l": "ringmetacarpal_l",
+    "ring_01_l": "hand_l",
     "ring_02_l": "ring_01_l",
     "ring_03_l": "ring_02_l",
-    "pinky_01_l": "pinkymetacarpal_l",
+    "pinky_01_l": "hand_l",
     "pinky_02_l": "pinky_01_l",
     "pinky_03_l": "pinky_02_l",
     
-    # Right Hand Fingers
+    # Right Hand Fingers (parented directly to hand_r)
     "thumb_01_r": "hand_r",
     "thumb_02_r": "thumb_01_r",
     "thumb_03_r": "thumb_02_r",
-    "index_01_r": "indexmetacarpal_r",
+    "index_01_r": "hand_r",
     "index_02_r": "index_01_r",
     "index_03_r": "index_02_r",
-    "middle_01_r": "midmetacarpal_r",
+    "middle_01_r": "hand_r",
     "middle_02_r": "middle_01_r",
     "middle_03_r": "middle_02_r",
-    "ring_01_r": "ringmetacarpal_r",
+    "ring_01_r": "hand_r",
     "ring_02_r": "ring_01_r",
     "ring_03_r": "ring_02_r",
-    "pinky_01_r": "pinkymetacarpal_r",
+    "pinky_01_r": "hand_r",
     "pinky_02_r": "pinky_01_r",
     "pinky_03_r": "pinky_02_r",
 
@@ -246,6 +225,11 @@ BONES_TO_DELETE = [
     "r_hand_anchor",
     "l_foot_anchor",
     "r_foot_anchor",
+    # 8 Hand Metacarpal Bones (Left & Right)
+    "indexmetacarpal_l", "midmetacarpal_l", "ringmetacarpal_l", "pinkymetacarpal_l",
+    "indexmetacarpal_r", "midmetacarpal_r", "ringmetacarpal_r", "pinkymetacarpal_r",
+    "l_indexmetacarpal", "l_midmetacarpal", "l_ringmetacarpal", "l_pinkymetacarpal",
+    "r_indexmetacarpal", "r_midmetacarpal", "r_ringmetacarpal", "r_pinkymetacarpal",
     # 20 Individual DAZ & Master SK Child Toe Bones (Left Foot)
     "l_bigtoe1", "l_bigtoe2", "l_indextoe1", "l_indextoe2",
     "l_midtoe1", "l_midtoe2", "l_ringtoe1", "l_ringtoe2",

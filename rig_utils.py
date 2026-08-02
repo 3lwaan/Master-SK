@@ -1,6 +1,7 @@
 import bpy
 import mathutils
 import fnmatch
+from datetime import datetime
 
 class ArmatureModeGuard:
     """
@@ -39,25 +40,45 @@ class ArmatureModeGuard:
         return False
 
 
+def add_audit_log_entry(context, step_name, message, status_type='SUCCESS', icon_name='CHECKMARK'):
+    """
+    Appends a timestamped status entry to scene.master_sk_audit_log.
+    """
+    if not context or not hasattr(context, "scene"):
+        return
+    log_list = getattr(context.scene, "master_sk_audit_log", None)
+    if log_list is not None:
+        item = log_list.add()
+        item.timestamp = datetime.now().strftime("%H:%M:%S")
+        item.step_name = step_name
+        item.message = message
+        item.status_type = status_type
+        item.icon_name = icon_name
+
+
 def validate_selection(context):
     """
     Validates that both a DAZ Armature (ARMATURE) and associated Character Mesh (MESH) are selected.
     Returns tuple: (armature_obj, list_of_mesh_objs, error_message)
     """
+    props = context.scene.master_sk_props
+    
+    # Priority 1: Pointer properties selected by user
+    armature_obj = props.target_body_armature
+    mesh_objs = [props.target_body_mesh] if props.target_body_mesh else []
+
+    if armature_obj and mesh_objs:
+        return armature_obj, mesh_objs, ""
+
+    # Priority 2: Viewport selection fallback
     selected = context.selected_objects
     if not selected:
         return None, [], "No objects selected. Please select your DAZ Armature and Character Mesh."
 
-    armature_obj = None
-    mesh_objs = []
-
     for obj in selected:
-        if obj.type == 'ARMATURE':
-            if armature_obj is None:
-                armature_obj = obj
-            else:
-                return None, [], "Multiple Armatures selected. Please select only ONE DAZ Armature."
-        elif obj.type == 'MESH':
+        if obj.type == 'ARMATURE' and not armature_obj:
+            armature_obj = obj
+        elif obj.type == 'MESH' and obj not in mesh_objs:
             mesh_objs.append(obj)
 
     if not armature_obj:
@@ -227,6 +248,12 @@ def is_child_toe_bone(b_name):
     return False
 
 
+def is_metacarpal_bone(b_name):
+    """Returns True for any hand metacarpal bone."""
+    name_lower = b_name.lower()
+    return "metacarpal" in name_lower
+
+
 def merge_child_toe_weights_to_toes(mesh_objs):
     """
     Merges all 20 child toe vertex weights into 'toes_l' and 'toes_r' before deleting child toe bones,
@@ -238,7 +265,6 @@ def merge_child_toe_weights_to_toes(mesh_objs):
 
         vgroups = mesh_obj.vertex_groups
         
-        # 1. Ensure destination groups exist or rename if named l_toes/ball_l/etc.
         toes_l_vg = vgroups.get("toes_l") or vgroups.get("l_toes") or vgroups.get("ltoe") or vgroups.get("ball_l")
         if toes_l_vg and toes_l_vg.name != "toes_l":
             toes_l_vg.name = "toes_l"
@@ -251,7 +277,6 @@ def merge_child_toe_weights_to_toes(mesh_objs):
         elif not toes_r_vg:
             toes_r_vg = vgroups.new(name="toes_r")
 
-        # 2. Collect left and right child toe vertex groups
         left_toe_vgs = []
         right_toe_vgs = []
 
@@ -271,7 +296,6 @@ def merge_child_toe_weights_to_toes(mesh_objs):
         if not left_indices and not right_indices:
             continue
 
-        # 3. Sum weights per vertex and add to toes_l / toes_r
         mesh_data = mesh_obj.data
         for v in mesh_data.vertices:
             left_sum = 0.0
@@ -298,7 +322,6 @@ def merge_child_toe_weights_to_toes(mesh_objs):
                 new_w = min(1.0, existing_r + right_sum)
                 toes_r_vg.add([v.index], new_w, 'REPLACE')
 
-        # 4. Safely remove old child toe vertex groups
         for vg in left_toe_vgs + right_toe_vgs:
             try:
                 vgroups.remove(vg)
@@ -306,15 +329,99 @@ def merge_child_toe_weights_to_toes(mesh_objs):
                 print(f"[MasterSK] Could not remove toe vertex group '{vg.name}': {e}")
 
 
+def merge_metacarpal_weights_to_hands(mesh_objs):
+    """
+    Transfers vertex weights from the 8 metacarpal vertex groups into 'hand_l' and 'hand_r'
+    before deleting metacarpal bones in Step 2.
+    Returns (transferred_vertex_count, purged_group_count)
+    """
+    transferred_verts = 0
+    purged_vgs_count = 0
+
+    for mesh_obj in mesh_objs:
+        if not mesh_obj or mesh_obj.type != 'MESH':
+            continue
+
+        vgroups = mesh_obj.vertex_groups
+        
+        hand_l_vg = vgroups.get("hand_l") or vgroups.get("l_hand")
+        if hand_l_vg and hand_l_vg.name != "hand_l":
+            hand_l_vg.name = "hand_l"
+        elif not hand_l_vg:
+            hand_l_vg = vgroups.new(name="hand_l")
+
+        hand_r_vg = vgroups.get("hand_r") or vgroups.get("r_hand")
+        if hand_r_vg and hand_r_vg.name != "hand_r":
+            hand_r_vg.name = "hand_r"
+        elif not hand_r_vg:
+            hand_r_vg = vgroups.new(name="hand_r")
+
+        left_meta_vgs = []
+        right_meta_vgs = []
+
+        for vg in list(vgroups):
+            name_lower = vg.name.lower()
+            if is_metacarpal_bone(vg.name):
+                if name_lower.endswith("_l") or name_lower.startswith("l_") or "left" in name_lower:
+                    left_meta_vgs.append(vg)
+                elif name_lower.endswith("_r") or name_lower.startswith("r_") or "right" in name_lower:
+                    right_meta_vgs.append(vg)
+
+        left_indices = {vg.index for vg in left_meta_vgs}
+        right_indices = {vg.index for vg in right_meta_vgs}
+
+        if not left_indices and not right_indices:
+            continue
+
+        mesh_data = mesh_obj.data
+        for v in mesh_data.vertices:
+            left_sum = 0.0
+            right_sum = 0.0
+            existing_l = 0.0
+            existing_r = 0.0
+
+            for g in v.groups:
+                if g.group == hand_l_vg.index:
+                    existing_l = g.weight
+                elif g.group == hand_r_vg.index:
+                    existing_r = g.weight
+
+                if g.group in left_indices:
+                    left_sum += g.weight
+                elif g.group in right_indices:
+                    right_sum += g.weight
+
+            if left_sum > 0.0:
+                new_w = min(1.0, existing_l + left_sum)
+                hand_l_vg.add([v.index], new_w, 'REPLACE')
+                transferred_verts += 1
+
+            if right_sum > 0.0:
+                new_w = min(1.0, existing_r + right_sum)
+                hand_r_vg.add([v.index], new_w, 'REPLACE')
+                transferred_verts += 1
+
+        for vg in left_meta_vgs + right_meta_vgs:
+            try:
+                vgroups.remove(vg)
+                purged_vgs_count += 1
+            except Exception as e:
+                print(f"[MasterSK] Could not remove metacarpal vertex group '{vg.name}': {e}")
+
+    return transferred_verts, purged_vgs_count
+
+
 def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     """
     Step 2 Rig Processing (Edit Mode):
-    - Deletes 'root', 'hip', anchor bones, 20 child toe bones, and driven bones (*(drv)*).
+    - Deletes 'root', 'hip', anchor bones, 20 child toe bones, 8 metacarpal bones, and driven bones (*(drv)*).
     - Top-level deformation bone is 'pelvis' (parent is None).
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
     hierarchy = reference_data.get("MASTER_SK_HIERARCHY", {})
     bones_to_delete_list = reference_data.get("BONES_TO_DELETE", [])
+
+    deleted_bone_names = []
 
     with ArmatureModeGuard(armature_obj, 'EDIT'):
         edit_bones = armature_obj.data.edit_bones
@@ -325,9 +432,17 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
             b_name = eb.name
             b_name_lower = b_name.lower()
             
-            if b_name in explicit_delete or b_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or is_child_toe_bone(b_name):
-                edit_bones.remove(eb)
-            elif "(drv)" in b_name_lower or fnmatch.fnmatch(b_name_lower, "*(drv)*"):
+            should_delete = (
+                b_name in explicit_delete or
+                b_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
+                is_child_toe_bone(b_name) or
+                is_metacarpal_bone(b_name) or
+                "(drv)" in b_name_lower or
+                fnmatch.fnmatch(b_name_lower, "*(drv)*")
+            )
+
+            if should_delete:
+                deleted_bone_names.append(b_name)
                 edit_bones.remove(eb)
 
         for eb in list(edit_bones):
@@ -351,15 +466,7 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                 else:
                     parent_eb = edit_bones.get(parent_target)
                     if not parent_eb:
-                        if parent_target.startswith("indexmetacarpal"):
-                            parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
-                        elif parent_target.startswith("midmetacarpal"):
-                            parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
-                        elif parent_target.startswith("ringmetacarpal"):
-                            parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
-                        elif parent_target.startswith("pinkymetacarpal"):
-                            parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
-                        elif parent_target == "neck02":
+                        if parent_target == "neck02":
                             parent_eb = edit_bones.get("neck01")
                         elif parent_target == "spine_04":
                             parent_eb = edit_bones.get("spine_03")
@@ -367,11 +474,13 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                     if parent_eb and parent_eb != child_eb:
                         child_eb.parent = parent_eb
 
+    return len(deleted_bone_names)
+
 
 def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
     """
     Renames armature edit bones to Master SK names and concurrently syncs vertex groups on mesh objects.
-    Deletes orphaned vertex groups (including child toe groups) and purges zero-weight vertex assignments.
+    Deletes orphaned vertex groups (including child toe and metacarpal groups) and purges zero-weight vertex assignments.
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
     bones_to_delete_list = reference_data.get("BONES_TO_DELETE", [])
@@ -394,6 +503,7 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
                 vg_name in deleted_names or
                 vg_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
                 is_child_toe_bone(vg_name) or
+                is_metacarpal_bone(vg_name) or
                 "(drv)" in vg_name_lower or
                 fnmatch.fnmatch(vg_name_lower, "*(drv)*")
             )
@@ -527,11 +637,85 @@ def inject_ue5_als_ik_bones(armature_obj):
             ik_hand_r.length = 0.15
 
 
-# --- STEP 4 HELPER ROUTINES ---
+# --- STEP 4 & STEP 5 MATERIAL & SPLIT ROUTINES ---
+
+def consolidate_pre_split_materials(mesh_obj):
+    """
+    Step 4 pre-split material consolidation:
+    1. 'Mouth Cavity' -> 'Head' slot.
+    2. 'Fingernails' / 'Toenails' / '*nail*' -> 'Arms' (or 'Body') slot (never Head).
+    Removes emptied material slots cleanly.
+    """
+    if not mesh_obj or mesh_obj.type != 'MESH' or not mesh_obj.material_slots:
+        return ""
+
+    logs = []
+
+    # 1. Identify Head slot index ('head' in name)
+    head_slot_idx = None
+    for idx, slot in enumerate(mesh_obj.material_slots):
+        if slot.material and "head" in slot.material.name.lower():
+            head_slot_idx = idx
+            break
+
+    # 2. Identify Arms / Body slot index (MUST NOT be Head)
+    arms_body_slot_idx = None
+    for idx, slot in enumerate(mesh_obj.material_slots):
+        if slot.material:
+            mname = slot.material.name.lower()
+            if "arm" in mname and "head" not in mname:
+                arms_body_slot_idx = idx
+                break
+
+    if arms_body_slot_idx is None:
+        for idx, slot in enumerate(mesh_obj.material_slots):
+            if slot.material:
+                mname = slot.material.name.lower()
+                if "body" in mname and "head" not in mname:
+                    arms_body_slot_idx = idx
+                    break
+
+    if arms_body_slot_idx is None and head_slot_idx is not None:
+        for idx, slot in enumerate(mesh_obj.material_slots):
+            if idx != head_slot_idx:
+                arms_body_slot_idx = idx
+                break
+
+    # Reassign polygons in 'Mouth Cavity' -> Head
+    if head_slot_idx is not None:
+        for poly in mesh_obj.data.polygons:
+            if poly.material_index < len(mesh_obj.material_slots):
+                slot_mat = mesh_obj.material_slots[poly.material_index].material
+                if slot_mat and ("mouth" in slot_mat.name.lower() and "cavity" in slot_mat.name.lower()):
+                    poly.material_index = head_slot_idx
+
+    # Reassign polygons in '*nail*' -> Arms/Body (NEVER Head)
+    if arms_body_slot_idx is not None:
+        for poly in mesh_obj.data.polygons:
+            if poly.material_index < len(mesh_obj.material_slots):
+                slot_mat = mesh_obj.material_slots[poly.material_index].material
+                if slot_mat and "nail" in slot_mat.name.lower():
+                    poly.material_index = arms_body_slot_idx
+
+    # Remove empty slots ('Mouth Cavity' and '*nail*') in a single backwards pass
+    with ArmatureModeGuard(mesh_obj, 'OBJECT'):
+        i = len(mesh_obj.material_slots) - 1
+        while i >= 0:
+            slot = mesh_obj.material_slots[i]
+            mat_name = slot.material.name.lower() if slot.material else ""
+            if ("mouth" in mat_name and "cavity" in mat_name) or "nail" in mat_name:
+                sname = slot.material.name if slot.material else f"Slot_{i}"
+                mesh_obj.active_material_index = i
+                bpy.ops.object.material_slot_remove()
+                logs.append(f"Merged slot '{sname}'")
+            i -= 1
+
+    return "; ".join(logs)
+
 
 def separate_head_mesh_by_material(mesh_obj):
     """
-    Searches mesh material slots for a slot starting with 'Head' (case-insensitive).
+    Searches mesh material slots for a slot containing 'head' (case-insensitive).
     Selects assigned polygons in EDIT mode, runs mesh.separate(type='SELECTED'),
     and names resulting objects 'SKM_Head_Mesh' and 'SKM_Body_Mesh'.
     Returns (head_mesh_obj, body_mesh_obj, error_msg)
@@ -541,12 +725,12 @@ def separate_head_mesh_by_material(mesh_obj):
 
     head_mat_idx = None
     for idx, slot in enumerate(mesh_obj.material_slots):
-        if slot.material and slot.material.name.lower().startswith("head"):
+        if slot.material and "head" in slot.material.name.lower():
             head_mat_idx = idx
             break
 
     if head_mat_idx is None:
-        return None, None, 'No material slot matching "Head" found on mesh.'
+        return None, None, 'No material slot containing "Head" found on mesh.'
 
     with ArmatureModeGuard(mesh_obj, 'EDIT'):
         bpy.ops.mesh.select_all(action='DESELECT')
@@ -571,7 +755,7 @@ def separate_head_mesh_by_material(mesh_obj):
     
     is_sep_head = False
     for slot in separated_obj.material_slots:
-        if slot.material and slot.material.name.lower().startswith("head"):
+        if slot.material and "head" in slot.material.name.lower():
             is_sep_head = True
             break
 
@@ -593,8 +777,8 @@ def separate_head_mesh_by_material(mesh_obj):
 def cleanup_material_slots_after_head_split(head_mesh_obj, body_mesh_obj):
     """
     Cleans material slots after separating head mesh from body mesh:
-    - SKM_Head_Mesh: Removes all material slots EXCEPT the slot starting with 'head'.
-    - SKM_Body_Mesh: Removes any material slot starting with 'head'.
+    - SKM_Head_Mesh: Removes all material slots EXCEPT slots containing 'head'.
+    - SKM_Body_Mesh: Removes any material slot containing 'head'.
     """
     if head_mesh_obj and head_mesh_obj.name in bpy.data.objects:
         with ArmatureModeGuard(head_mesh_obj, 'OBJECT'):
@@ -602,7 +786,7 @@ def cleanup_material_slots_after_head_split(head_mesh_obj, body_mesh_obj):
             while i >= 0:
                 slot = head_mesh_obj.material_slots[i]
                 mat_name = slot.material.name.lower() if slot.material else ""
-                if not mat_name.startswith("head"):
+                if "head" not in mat_name:
                     head_mesh_obj.active_material_index = i
                     bpy.ops.object.material_slot_remove()
                 i -= 1
@@ -613,7 +797,7 @@ def cleanup_material_slots_after_head_split(head_mesh_obj, body_mesh_obj):
             while i >= 0:
                 slot = body_mesh_obj.material_slots[i]
                 mat_name = slot.material.name.lower() if slot.material else ""
-                if mat_name.startswith("head"):
+                if "head" in mat_name:
                     body_mesh_obj.active_material_index = i
                     bpy.ops.object.material_slot_remove()
                 i -= 1
@@ -632,7 +816,7 @@ def is_bone_or_ancestor_head(ebone):
 def prune_face_rig_bones(face_armature_obj):
     """
     Prunes SKM_Face_Rig to keep ONLY:
-    - Anchor chain: root, pelvis, spine_01..04, pectoral_l/r, clavicle_l/r, upperarm_l/r, neck01, neck02, head.
+    - Anchor chain: root, pelvis, spine_01..04, pectoral_l/r, clavicle_l/r, upperarm_l/r, upperarm_twist_01_l/r, neck01, neck02, head.
     - All facial expression bones parented directly or indirectly under 'head'.
     Deletes all other body deformation bones.
     """
@@ -687,3 +871,130 @@ def purge_orphaned_vgroups_for_split(mesh_obj, armature_obj):
                 vgroups.remove(vg)
             except Exception as e:
                 pass
+
+
+def force_uv_layer_name(mesh_obj, target_name="UVMap"):
+    """Renames primary UV layer on mesh_obj to target_name."""
+    if not mesh_obj or mesh_obj.type != 'MESH':
+        return
+    uv_layers = mesh_obj.data.uv_layers
+    if uv_layers:
+        primary = uv_layers.get("Base Multi UDIM") or uv_layers.get("UVMap") or uv_layers[0]
+        if primary:
+            primary.name = target_name
+
+
+def join_head_and_facial_meshes(head_mesh_obj, facial_mesh_objs):
+    """
+    Standardises UV map layer names on head_mesh_obj and facial_mesh_objs to 'UVMap',
+    sets head_mesh_obj active, selects facial_mesh_objs, and executes bpy.ops.object.join().
+    """
+    if not head_mesh_obj or head_mesh_obj.type != 'MESH':
+        return False, "SKM_Head_Mesh invalid or missing."
+
+    valid_facials = [m for m in facial_mesh_objs if m and m.name in bpy.data.objects and m.type == 'MESH']
+    
+    # 1. Force UV layer name = 'UVMap' across all objects
+    force_uv_layer_name(head_mesh_obj, "UVMap")
+    for fm in valid_facials:
+        force_uv_layer_name(fm, "UVMap")
+
+    if not valid_facials:
+        return True, "No external facial meshes selected; kept SKM_Head_Mesh intact."
+
+    # 2. Join in Object Mode
+    if bpy.context.object and bpy.context.object.mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+    bpy.ops.object.select_all(action='DESELECT')
+
+    for fm in valid_facials:
+        fm.hide_set(False)
+        fm.select_set(True)
+
+    head_mesh_obj.hide_set(False)
+    head_mesh_obj.select_set(True)
+    bpy.context.view_layer.objects.active = head_mesh_obj
+
+    bpy.ops.object.join()
+
+    return True, f"Joined {len(valid_facials)} facial mesh(es) into 'SKM_Head_Mesh'."
+
+
+def consolidate_post_join_head_materials(head_mesh_obj):
+    """
+    Step 5 Post-Join Material Consolidation on SKM_Head_Mesh:
+    1. Teeth -> Mouth Merge
+    2. EyeMoisture / Moisture -> Eyes Merge
+    Uses bulletproof 2-pass reassignment & slot removal.
+    """
+    if not head_mesh_obj or head_mesh_obj.type != 'MESH' or not head_mesh_obj.material_slots:
+        return ""
+
+    logs = []
+
+    # 1. Identify Mouth slot index
+    mouth_slot_idx = None
+    for idx, slot in enumerate(head_mesh_obj.material_slots):
+        if slot.material:
+            mname = slot.material.name.lower()
+            if "mouth" in mname or "lip" in mname:
+                mouth_slot_idx = idx
+                break
+
+    # Fallback: head slot if mouth slot not found
+    if mouth_slot_idx is None:
+        for idx, slot in enumerate(head_mesh_obj.material_slots):
+            if slot.material and "head" in slot.material.name.lower():
+                mouth_slot_idx = idx
+                break
+
+    # 2. Identify Eyes slot index (not moisture)
+    eyes_slot_idx = None
+    for idx, slot in enumerate(head_mesh_obj.material_slots):
+        if slot.material:
+            mname = slot.material.name.lower()
+            if "eye" in mname and "moisture" not in mname and "lash" not in mname:
+                eyes_slot_idx = idx
+                break
+
+    # Pass 1: Reassign face polygons
+    if mouth_slot_idx is not None:
+        for poly in head_mesh_obj.data.polygons:
+            if poly.material_index < len(head_mesh_obj.material_slots):
+                slot_mat = head_mesh_obj.material_slots[poly.material_index].material
+                if slot_mat and "teeth" in slot_mat.name.lower():
+                    poly.material_index = mouth_slot_idx
+
+    if eyes_slot_idx is not None:
+        for poly in head_mesh_obj.data.polygons:
+            if poly.material_index < len(head_mesh_obj.material_slots):
+                slot_mat = head_mesh_obj.material_slots[poly.material_index].material
+                if slot_mat and "moisture" in slot_mat.name.lower():
+                    poly.material_index = eyes_slot_idx
+
+    # Pass 2: Remove empty slots ('Teeth' and 'EyeMoisture')
+    with ArmatureModeGuard(head_mesh_obj, 'OBJECT'):
+        i = len(head_mesh_obj.material_slots) - 1
+        while i >= 0:
+            slot = head_mesh_obj.material_slots[i]
+            mat_name = slot.material.name.lower() if slot.material else ""
+            if "teeth" in mat_name or "moisture" in mat_name:
+                sname = slot.material.name if slot.material else f"Slot_{i}"
+                head_mesh_obj.active_material_index = i
+                bpy.ops.object.material_slot_remove()
+                logs.append(f"Merged slot '{sname}'")
+            i -= 1
+
+    return "; ".join(logs)
+
+
+def audit_final_material_slots(head_mesh_obj, body_mesh_obj):
+    """
+    Audits final material slots on Head Mesh and Body Mesh.
+    Returns audit summary string.
+    """
+    head_slots = [slot.material.name for slot in head_mesh_obj.material_slots if slot.material] if head_mesh_obj else []
+    body_slots = [slot.material.name for slot in body_mesh_obj.material_slots if slot.material] if body_mesh_obj else []
+
+    return f"Head Slots ({len(head_slots)}): {', '.join(head_slots)} | Body Slots ({len(body_slots)}): {', '.join(body_slots)}"

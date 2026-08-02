@@ -17,36 +17,26 @@ class MSK_PT_main_panel(bpy.types.Panel):
             props.step1_completed,
             props.step2_completed,
             props.step3_completed,
-            props.step4_completed
+            props.step4_completed,
+            props.step5_completed
         ])
         
         # Header Box
         header_box = layout.box()
         h_row = header_box.row(align=True)
-        h_row.label(text="Master SK Pipeline", icon='ARMATURE_DATA')
-        h_row.label(text=f"[{completed_steps}/4 Done]")
+        h_row.label(text="Master SK Pipeline v2.0", icon='ARMATURE_DATA')
+        h_row.label(text=f"[{completed_steps}/5 Done]")
 
-        # Active Selection Info Box
-        sel_box = layout.box()
-        s_col = sel_box.column(align=True)
-        
-        armature_names = []
-        mesh_names = []
-        for obj in context.selected_objects:
-            if obj.type == 'ARMATURE':
-                armature_names.append(obj.name)
-            elif obj.type == 'MESH':
-                mesh_names.append(obj.name)
+        # Dynamic Object Target Selectors Box
+        target_box = layout.box()
+        t_header = target_box.row(align=True)
+        t_header.label(text="Target Object Dropdowns", icon='OBJECT_DATA')
 
-        if armature_names:
-            s_col.label(text=f"Rig: {', '.join(armature_names[:2])}", icon='POSE_HLT')
-        else:
-            s_col.label(text="Rig: None Selected", icon='RADIOBUT_OFF')
-
-        if mesh_names:
-            s_col.label(text=f"Mesh: {', '.join(mesh_names[:2])}", icon='OUTLINER_OB_MESH')
-        else:
-            s_col.label(text="Mesh: None Selected", icon='RADIOBUT_OFF')
+        t_col = target_box.column(align=True)
+        t_col.prop(props, "target_body_armature")
+        t_col.prop(props, "target_body_mesh")
+        t_col.prop(props, "target_head_armature")
+        t_col.prop(props, "target_head_mesh")
 
         # Status Message Box
         if props.status_message:
@@ -86,7 +76,7 @@ class MSK_PT_main_panel(bpy.types.Panel):
 
         g2_col = step2_box.column(align=True)
         g2_col.scale_y = 0.8
-        g2_col.label(text="Purge helpers/toes, clear constraints, UVMap", icon='HELP')
+        g2_col.label(text="Purge helpers/toes/metacarpals, transfer weights", icon='HELP')
 
         b2_col = step2_box.column(align=True)
         b2_col.scale_y = 1.25
@@ -118,11 +108,57 @@ class MSK_PT_main_panel(bpy.types.Panel):
 
         g4_col = step4_box.column(align=True)
         g4_col.scale_y = 0.8
-        g4_col.label(text="Split head mesh & create Body/Face Rigs", icon='HELP')
+        g4_col.label(text="Consolidate materials, split head & create rigs", icon='HELP')
 
         b4_col = step4_box.column(align=True)
         b4_col.scale_y = 1.25
         b4_col.operator("master_sk.separate_head_modularize", text="4. Separate Head & Modularize Rigs", icon='MOD_BOOLEAN')
+
+        layout.separator()
+
+        # STEP 5 BOX
+        step5_box = layout.box()
+        s5_row = step5_box.row(align=True)
+        s5_icon = 'CHECKMARK' if props.step5_completed else 'RADIOBUT_OFF'
+        s5_row.label(text="Step 5: Join Facial Meshes & Materials", icon=s5_icon)
+
+        s5_pickers = step5_box.column(align=True)
+        s5_pickers.prop(props, "target_eyes_mesh")
+        s5_pickers.prop(props, "target_eyelashes_mesh")
+        s5_pickers.prop(props, "target_mouth_mesh")
+
+        g5_col = step5_box.column(align=True)
+        g5_col.scale_y = 0.8
+        g5_col.label(text="Enforce UVMap, join facial meshes & merge slots", icon='HELP')
+
+        b5_col = step5_box.column(align=True)
+        b5_col.scale_y = 1.25
+        b5_col.operator("master_sk.join_facial_meshes", text="5. Join Facial Meshes & Finalize Head", icon='AUTOMERGE_ON')
+
+        layout.separator()
+
+        # COLLAPSIBLE PIPELINE AUDIT CHECKLIST BOX
+        audit_box = layout.box()
+        a_header = audit_box.row(align=True)
+        a_icon = 'TRIA_DOWN' if props.show_audit_log else 'TRIA_RIGHT'
+        a_header.prop(props, "show_audit_log", text="Pipeline Audit Checklist", icon=a_icon, icon_only=False, emboss=False)
+
+        if props.show_audit_log:
+            audit_log = getattr(scene, "master_sk_audit_log", [])
+            if not audit_log:
+                audit_box.label(text="No audit entries logged yet.", icon='INFO')
+            else:
+                log_col = audit_box.column(align=True)
+                for item in reversed(audit_log[-12:]):
+                    l_row = log_col.row(align=True)
+                    l_row.scale_y = 0.85
+                    
+                    ic = item.icon_name if item.icon_name else ('CHECKMARK' if item.status_type == 'SUCCESS' else 'INFO')
+                    if item.status_type == 'ERROR':
+                        ic = 'ERROR'
+                        l_row.alert = True
+                    
+                    l_row.label(text=f"[{item.timestamp}] {item.step_name}: {item.message}", icon=ic)
 
         layout.separator()
 
