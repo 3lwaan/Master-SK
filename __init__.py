@@ -46,6 +46,10 @@ class MasterSKProperties(PropertyGroup):
         name="Step 3 Completed",
         default=False
     )
+    step4_completed: BoolProperty(
+        name="Step 4 Completed",
+        default=False
+    )
     status_message: StringProperty(
         name="Status Message",
         default="Ready. Select your DAZ Armature and Character Mesh to begin."

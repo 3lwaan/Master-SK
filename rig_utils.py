@@ -103,7 +103,7 @@ def rename_armature_and_datablock(armature_obj, mesh_objs):
     """
     1. Armature Object Name (Orange Icon): Renames to 'SKM_' + mesh_name (e.g. 'SKM Nina' / 'SKM_Nina').
     2. Armature Data Block Name (Green Icon): Renames armature.data.name directly to 'root'.
-       Frees up conflicting datablocks in bpy.data.armatures so the active datablock receives the exact name 'root'.
+       Frees up conflicting datablocks in bpy.data.armatures so active datablock receives exact name 'root'.
     """
     if mesh_objs:
         mesh_name = mesh_objs[0].name.replace(".001", "").strip()
@@ -113,7 +113,6 @@ def rename_armature_and_datablock(armature_obj, mesh_objs):
             target_obj_name = mesh_name
         armature_obj.name = target_obj_name
 
-    # Free up 'root' name in bpy.data.armatures if another datablock holds it
     current_data = armature_obj.data
     for other_arm in list(bpy.data.armatures):
         if other_arm != current_data and other_arm.name in ["root", "root.001", "root.002", "root.003"]:
@@ -139,6 +138,38 @@ def purge_all_bone_collections(armature_obj):
             arm_data.collections.remove(arm_data.collections[0])
 
 
+def clear_pelvis_constraints(armature_obj):
+    """
+    Clears all pose constraints on the 'pelvis' bone (e.g. Limit Rotation)
+    so ALS can freely control pelvic translation and rotation.
+    """
+    if not armature_obj or armature_obj.type != 'ARMATURE':
+        return
+    
+    pelvis_pb = armature_obj.pose.bones.get("pelvis")
+    if pelvis_pb and pelvis_pb.constraints:
+        for c in list(pelvis_pb.constraints):
+            try:
+                pelvis_pb.constraints.remove(c)
+            except Exception as e:
+                print(f"[MasterSK] Could not remove constraint '{c.name}': {e}")
+
+
+def rename_uv_layers(mesh_objs):
+    """
+    Iterates through mesh objects and renames the primary UV layer
+    (e.g. 'Base Multi UDIM' or first layer) to 'UVMap'.
+    """
+    for mesh_obj in mesh_objs:
+        if not mesh_obj or mesh_obj.type != 'MESH':
+            continue
+        uv_layers = mesh_obj.data.uv_layers
+        if uv_layers:
+            primary_layer = uv_layers.get("Base Multi UDIM") or uv_layers[0]
+            if primary_layer:
+                primary_layer.name = "UVMap"
+
+
 def merge_hip_weights_to_pelvis(mesh_objs):
     """
     Merges vertex group weights from 'hip' into 'pelvis' on all mesh objects
@@ -158,7 +189,6 @@ def merge_hip_weights_to_pelvis(mesh_objs):
             hip_vg.name = "pelvis"
             continue
 
-        # Both hip and pelvis vertex groups exist: merge hip weights into pelvis
         mesh_data = mesh_obj.data
         for v in mesh_data.vertices:
             hip_w = 0.0
@@ -183,7 +213,7 @@ def merge_hip_weights_to_pelvis(mesh_objs):
 def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     """
     Step 2 Rig Processing (Edit Mode):
-    - Deletes 'root', 'hip', anchor bones, and driven bones (*(drv)*).
+    - Deletes 'root', 'hip', anchor bones, 20 child toe bones, and driven bones (*(drv)*).
     - Top-level deformation bone is 'pelvis' (parent is None).
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
@@ -193,7 +223,6 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     with ArmatureModeGuard(armature_obj, 'EDIT'):
         edit_bones = armature_obj.data.edit_bones
 
-        # 1. Delete physical 'root' / 'Root' / 'hip' bones and explicitly marked anchor/driven bones
         explicit_delete = set(bones_to_delete_list) | {"root", "Root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
         
         for eb in list(edit_bones):
@@ -205,7 +234,6 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
             elif "(drv)" in b_name_lower or fnmatch.fnmatch(b_name_lower, "*(drv)*"):
                 edit_bones.remove(eb)
 
-        # 2. Perform bone mapping & renaming for remaining bones cleanly
         for eb in list(edit_bones):
             orig_name = eb.name
             if orig_name in daz_map:
@@ -215,12 +243,10 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                         edit_bones.remove(edit_bones[target_name])
                     eb.name = target_name
 
-        # 3. Ensure pelvis is top-level (parent is None)
         pelvis_eb = edit_bones.get("pelvis")
         if pelvis_eb:
             pelvis_eb.parent = None
 
-        # 4. Restructure remaining bones according to MASTER_SK_HIERARCHY with fallback handling
         for child_target, parent_target in hierarchy.items():
             child_eb = edit_bones.get(child_target)
             if child_eb:
@@ -228,8 +254,6 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                     child_eb.parent = None
                 else:
                     parent_eb = edit_bones.get(parent_target)
-                    
-                    # Smart fallbacks if specific optional parent bone is absent
                     if not parent_eb:
                         if parent_target.startswith("indexmetacarpal"):
                             parent_eb = edit_bones.get("hand_l" if parent_target.endswith("_l") else "hand_r")
@@ -251,7 +275,7 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
 def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
     """
     Renames armature edit bones to Master SK names and concurrently syncs vertex groups on mesh objects.
-    Deletes orphaned vertex groups and purges zero-weight vertex assignments.
+    Deletes orphaned vertex groups (including child toe groups) and purges zero-weight vertex assignments.
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
     bones_to_delete_list = reference_data.get("BONES_TO_DELETE", [])
@@ -325,7 +349,7 @@ def inject_ue5_als_ik_bones(armature_obj):
     Step 3 Operator Logic:
     - Root IK Bones (ik_foot_root, ik_hand_root):
         Head: (0.0, 0.0, 0.0), Tail: (0.0, 0.0, 0.2), length = 0.2 meters.
-        Parent: None (Top-level IK roots, no physical root edit bone).
+        Parent: None (Top-level IK roots).
     - Foot IK Bones (ik_foot_l, ik_foot_r):
         Snap head to foot_l/r.head, copy matrix, length = target_foot_bone.length (or 0.15).
         Parent: ik_foot_root.
@@ -341,12 +365,10 @@ def inject_ue5_als_ik_bones(armature_obj):
                 return edit_bones[name]
             return edit_bones.new(name)
 
-        # 0. Ensure physical 'root' / 'Root' edit bone is deleted if present
         for r_name in ["root", "Root"]:
             if r_name in edit_bones:
                 edit_bones.remove(edit_bones[r_name])
 
-        # 1. Root IK Bones (ik_foot_root, ik_hand_root - Top-Level)
         ik_foot_root = get_or_create_bone("ik_foot_root")
         ik_foot_root.head = (0.0, 0.0, 0.0)
         ik_foot_root.tail = (0.0, 0.0, 0.2)
@@ -359,7 +381,6 @@ def inject_ue5_als_ik_bones(armature_obj):
         ik_hand_root.length = 0.2
         ik_hand_root.parent = None
 
-        # 2. Foot IK Bones (ik_foot_l, ik_foot_r)
         foot_l = edit_bones.get("foot_l") or edit_bones.get("l_foot")
         ik_foot_l = get_or_create_bone("ik_foot_l")
         ik_foot_l.parent = ik_foot_root
@@ -384,7 +405,6 @@ def inject_ue5_als_ik_bones(armature_obj):
             ik_foot_r.tail = (-0.2, 0.0, 0.25)
             ik_foot_r.length = 0.15
 
-        # 3. Hand IK Bones (ik_hand_l, ik_hand_r)
         hand_l = edit_bones.get("hand_l") or edit_bones.get("l_hand")
         ik_hand_l = get_or_create_bone("ik_hand_l")
         ik_hand_l.parent = ik_hand_root
@@ -408,3 +428,164 @@ def inject_ue5_als_ik_bones(armature_obj):
             ik_hand_r.head = (-0.6, 0.0, 1.4)
             ik_hand_r.tail = (-0.6, 0.0, 1.55)
             ik_hand_r.length = 0.15
+
+
+# --- STEP 4 HELPER ROUTINES ---
+
+def separate_head_mesh_by_material(mesh_obj):
+    """
+    Searches mesh material slots for a slot starting with 'Head' (case-insensitive).
+    Selects assigned polygons in EDIT mode, runs mesh.separate(type='SELECTED'),
+    and names resulting objects 'SKM_Head_Mesh' and 'SKM_Body_Mesh'.
+    Returns (head_mesh_obj, body_mesh_obj, error_msg)
+    """
+    if not mesh_obj or mesh_obj.type != 'MESH':
+        return None, None, "Invalid character mesh object selected."
+
+    head_mat_idx = None
+    for idx, slot in enumerate(mesh_obj.material_slots):
+        if slot.material and slot.material.name.lower().startswith("head"):
+            head_mat_idx = idx
+            break
+
+    if head_mat_idx is None:
+        return None, None, 'No material slot matching "Head" found on mesh.'
+
+    with ArmatureModeGuard(mesh_obj, 'EDIT'):
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.mode_set(mode='OBJECT')
+        
+        for poly in mesh_obj.data.polygons:
+            if poly.material_index == head_mat_idx:
+                poly.select = True
+                
+        bpy.ops.object.mode_set(mode='EDIT')
+        
+        objs_before = set(bpy.context.scene.objects)
+        bpy.ops.mesh.separate(type='SELECTED')
+        objs_after = set(bpy.context.scene.objects)
+
+    new_objs = [o for o in (objs_after - objs_before) if o.type == 'MESH']
+    
+    if not new_objs:
+        return None, None, "Failed to separate head mesh geometry."
+
+    separated_obj = new_objs[0]
+    
+    is_sep_head = False
+    for slot in separated_obj.material_slots:
+        if slot.material and slot.material.name.lower().startswith("head"):
+            is_sep_head = True
+            break
+
+    if is_sep_head:
+        head_mesh_obj = separated_obj
+        body_mesh_obj = mesh_obj
+    else:
+        head_mesh_obj = mesh_obj
+        body_mesh_obj = separated_obj
+
+    head_mesh_obj.name = "SKM_Head_Mesh"
+    body_mesh_obj.name = "SKM_Body_Mesh"
+
+    cleanup_material_slots_after_head_split(head_mesh_obj, body_mesh_obj)
+
+    return head_mesh_obj, body_mesh_obj, ""
+
+
+def cleanup_material_slots_after_head_split(head_mesh_obj, body_mesh_obj):
+    """
+    Cleans material slots after separating head mesh from body mesh:
+    - SKM_Head_Mesh: Removes all material slots EXCEPT the slot starting with 'head'.
+    - SKM_Body_Mesh: Removes any material slot starting with 'head'.
+    """
+    if head_mesh_obj and head_mesh_obj.name in bpy.data.objects:
+        with ArmatureModeGuard(head_mesh_obj, 'OBJECT'):
+            i = len(head_mesh_obj.material_slots) - 1
+            while i >= 0:
+                slot = head_mesh_obj.material_slots[i]
+                mat_name = slot.material.name.lower() if slot.material else ""
+                if not mat_name.startswith("head"):
+                    head_mesh_obj.active_material_index = i
+                    bpy.ops.object.material_slot_remove()
+                i -= 1
+
+    if body_mesh_obj and body_mesh_obj.name in bpy.data.objects:
+        with ArmatureModeGuard(body_mesh_obj, 'OBJECT'):
+            i = len(body_mesh_obj.material_slots) - 1
+            while i >= 0:
+                slot = body_mesh_obj.material_slots[i]
+                mat_name = slot.material.name.lower() if slot.material else ""
+                if mat_name.startswith("head"):
+                    body_mesh_obj.active_material_index = i
+                    bpy.ops.object.material_slot_remove()
+                i -= 1
+
+
+def is_bone_or_ancestor_head(ebone):
+    """Returns True if ebone is 'head' or has 'head' as ancestor in edit mode."""
+    curr = ebone
+    while curr:
+        if curr.name == "head":
+            return True
+        curr = curr.parent
+    return False
+
+
+def prune_face_rig_bones(face_armature_obj):
+    """
+    Prunes SKM_Face_Rig to keep ONLY:
+    - Anchor chain: root, pelvis, spine_01..04, pectoral_l/r, clavicle_l/r, upperarm_l/r, neck01, neck02, head.
+    - All facial expression bones parented directly or indirectly under 'head'.
+    Deletes all other body deformation bones.
+    """
+    allowed_anchor_bones = {
+        "root", "pelvis", "spine_01", "spine_02", "spine_03", "spine_04",
+        "pectoral_l", "pectoral_r", "clavicle_l", "upperarm_l", "clavicle_r", "upperarm_r",
+        "neck01", "neck02", "head"
+    }
+
+    with ArmatureModeGuard(face_armature_obj, 'EDIT'):
+        edit_bones = face_armature_obj.data.edit_bones
+
+        for eb in list(edit_bones):
+            b_name = eb.name
+            if b_name in allowed_anchor_bones:
+                continue
+            if is_bone_or_ancestor_head(eb):
+                continue
+            
+            edit_bones.remove(eb)
+
+
+def prune_body_rig_bones(body_armature_obj):
+    """
+    Prunes SKM_Body_Rig by deleting ALL facial expression bones parented under 'head',
+    preserving neck01 -> neck02 -> head.
+    """
+    with ArmatureModeGuard(body_armature_obj, 'EDIT'):
+        edit_bones = body_armature_obj.data.edit_bones
+
+        for eb in list(edit_bones):
+            if eb.name == "head":
+                continue
+            if is_bone_or_ancestor_head(eb):
+                edit_bones.remove(eb)
+
+
+def purge_orphaned_vgroups_for_split(mesh_obj, armature_obj):
+    """
+    Deletes vertex groups on mesh_obj that do not exist as active bones on armature_obj.
+    """
+    if not mesh_obj or mesh_obj.type != 'MESH' or not armature_obj or armature_obj.type != 'ARMATURE':
+        return
+
+    active_bone_names = set(b.name for b in armature_obj.data.bones)
+    vgroups = mesh_obj.vertex_groups
+
+    for vg in list(vgroups):
+        if vg.name not in active_bone_names:
+            try:
+                vgroups.remove(vg)
+            except Exception as e:
+                pass
