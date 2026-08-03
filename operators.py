@@ -88,7 +88,7 @@ class MSK_OT_process_rig_vertex_groups(bpy.types.Operator):
             ref_path = props.custom_reference_path if props.use_custom_reference else None
             ref_data = load_reference_data(ref_path)
 
-            # 1. Rename Armature Object to 'SKM <mesh_name>' and Datablock to 'root'
+            # 1. Rename Armature Object to 'root' directly and Datablock to 'root'
             rename_armature_and_datablock(armature_obj, mesh_objs)
 
             # 2. Completely wipe all Bone Collections (Blender 4.4.3 un-grouped structure)

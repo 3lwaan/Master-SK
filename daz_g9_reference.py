@@ -20,12 +20,14 @@ DAZ_TO_MASTER_MAP = {
     "spine_03": "spine_03",
     "spine_04": "spine_04",
     
-    # Neck & Head
-    "neck": "neck01",
-    "neck1": "neck01",
-    "neck_01": "neck01",
-    "neck2": "neck02",
-    "neck_02": "neck02",
+    # Neck & Head (UE5 Standard: neck_01, neck_02)
+    "neck": "neck_01",
+    "neck1": "neck_01",
+    "neck_01": "neck_01",
+    "neck01": "neck_01",
+    "neck2": "neck_02",
+    "neck_02": "neck_02",
+    "neck02": "neck_02",
     "head": "head",
     
     # Eye Bones (UE5 Standard: eye_l / eye_r)
@@ -226,10 +228,10 @@ MASTER_SK_HIERARCHY = {
     "pectoral_l": "spine_03",
     "pectoral_r": "spine_03",
 
-    # Neck & Head
-    "neck01": "spine_04",
-    "neck02": "neck01",
-    "head": "neck02",
+    # Neck & Head (neck_01 -> neck_02 -> head)
+    "neck_01": "spine_04",
+    "neck_02": "neck_01",
+    "head": "neck_02",
     "eye_l": "head",
     "eye_r": "head",
     "l_ear": "head",

@@ -120,32 +120,6 @@ def apply_transforms(armature_obj, mesh_objs):
         orig_active.select_set(True)
 
 
-def rename_armature_and_datablock(armature_obj, mesh_objs):
-    """
-    1. Armature Object Name (Orange Icon): Renames to 'SKM_' + mesh_name (e.g. 'SKM Nina' / 'SKM_Nina').
-    2. Armature Data Block Name (Green Icon): Renames armature.data.name directly to 'root'.
-       Frees up conflicting datablocks in bpy.data.armatures so active datablock receives exact name 'root'.
-    """
-    if mesh_objs:
-        mesh_name = mesh_objs[0].name.replace(".001", "").strip()
-        if not mesh_name.startswith("SKM_") and not mesh_name.startswith("SKM "):
-            target_obj_name = f"SKM_{mesh_name}"
-        else:
-            target_obj_name = mesh_name
-        armature_obj.name = target_obj_name
-
-    current_data = armature_obj.data
-    for other_arm in list(bpy.data.armatures):
-        if other_arm != current_data and other_arm.name in ["root", "root.001", "root.002", "root.003"]:
-            if other_arm.users == 0:
-                try:
-                    bpy.data.armatures.remove(other_arm)
-                except Exception:
-                    other_arm.name = f"old_{other_arm.name}"
-            else:
-                other_arm.name = f"old_{other_arm.name}"
-
-    current_data.name = "root"
 
 
 def purge_all_bone_collections(armature_obj):
@@ -922,27 +896,89 @@ def cleanup_material_slots_after_head_split(head_mesh_obj, body_mesh_obj):
                 i -= 1
 
 
+def rename_armature_and_datablock(armature_obj, mesh_objs):
+    """
+    1. Armature Object Name (Orange Icon): Renames to 'root' directly.
+    2. Armature Data Block Name (Green Icon): Renames armature.data.name directly to 'root'.
+       Frees up conflicting object/datablock names in bpy.data so active armature receives exact name 'root'.
+    """
+    if not armature_obj:
+        return
+
+    # Free up conflicting object name 'root'
+    for other_obj in list(bpy.data.objects):
+        if other_obj != armature_obj and other_obj.name.lower() == "root":
+            other_obj.name = f"old_{other_obj.name}"
+
+    armature_obj.name = "root"
+
+    current_data = armature_obj.data
+    for other_arm in list(bpy.data.armatures):
+        if other_arm != current_data and other_arm.name.lower() == "root":
+            if other_arm.users == 0:
+                try:
+                    bpy.data.armatures.remove(other_arm)
+                except Exception:
+                    other_arm.name = f"old_{other_arm.name}"
+            else:
+                other_arm.name = f"old_{other_arm.name}"
+
+    current_data.name = "root"
+
+
+def purge_bone_collections(armature_obj):
+    """
+    Completely wipes/clears all bone collections from armature.data.collections (Blender 4.4+).
+    Ensures bone list is completely un-grouped and clean.
+    """
+    arm_data = armature_obj.data
+    if hasattr(arm_data, "collections"):
+        while arm_data.collections:
+            arm_data.collections.remove(arm_data.collections[0])
+
+
+def clear_pelvis_constraints(armature_obj):
+    """
+    Clears all pose constraints on the 'pelvis' bone (e.g. Limit Rotation)
+    so ALS can freely control pelvic translation and rotation.
+    """
+    if not armature_obj or armature_obj.type != 'ARMATURE':
+        return
+    
+    pelvis_pb = armature_obj.pose.bones.get("pelvis")
+    if pelvis_pb and pelvis_pb.constraints:
+        for c in list(pelvis_pb.constraints):
+            try:
+                pelvis_pb.constraints.remove(c)
+            except Exception as e:
+                pass
+
+
 def is_bone_or_ancestor_head(ebone):
     """
     Returns True if ebone is 'head' (case-insensitive) or has 'head' as an ancestor in edit mode,
     or is an eye, eyelid, eyelash, eyebrow, jaw, lip, tongue, or facial expression bone.
+    Neck bones (neck_01, neck_02) are NOT facial bones.
     """
     if not ebone:
         return False
     
     b_name_lower = ebone.name.lower().replace("g9_", "").replace("genesis9_", "").strip()
     
-    # Direct facial/eye bone keyword check
-    facial_keywords = ["head", "eye", "lid", "brow", "lash", "jaw", "lip", "tongue", "mouth", "cheek", "chin", "nose", "face"]
+    # Direct check for neck and body bones
+    if b_name_lower in ["neck_01", "neck_02", "neck01", "neck02", "spine_04", "spine_03", "pelvis", "root"]:
+        return False
+
+    facial_keywords = ["eye", "lid", "brow", "lash", "jaw", "lip", "tongue", "mouth", "cheek", "chin", "nose", "face", "facerig"]
     for kw in facial_keywords:
         if kw in b_name_lower:
             return True
 
-    # Ancestor chain check up to armature root
+    # Ancestor chain check up to armature root (ONLY checking if parent is head or facial rig)
     curr = ebone
     while curr:
         cname = curr.name.lower().replace("g9_", "").replace("genesis9_", "").strip()
-        if "head" in cname or "neck02" in cname or "neck_02" in cname:
+        if cname == "head" or "upperfacerig" in cname or "lowerfacerig" in cname:
             return True
         curr = curr.parent
         
@@ -952,7 +988,7 @@ def is_bone_or_ancestor_head(ebone):
 def prune_face_rig_bones(face_armature_obj):
     """
     Prunes SKM_Face_Rig to keep ONLY:
-    - Anchor chain: root, pelvis, spine_01..04, pectoral_l/r, clavicle_l/r, upperarm_l/r, upperarm_twist_01_l/r, neck01, neck02, head.
+    - Anchor chain: root, pelvis, spine_01..04, pectoral_l/r, clavicle_l/r, upperarm_l/r, upperarm_twist_01_l/r, neck_01, neck_02, head.
     - All facial expression bones parented directly or indirectly under 'head'.
     Deletes all other body deformation bones.
     """
@@ -960,7 +996,7 @@ def prune_face_rig_bones(face_armature_obj):
         "root", "pelvis", "spine_01", "spine_02", "spine_03", "spine_04",
         "pectoral_l", "pectoral_r", "clavicle_l", "upperarm_l", "clavicle_r", "upperarm_r",
         "upperarm_twist_01_l", "upperarm_twist_01_r", "l_upperarm_twist", "r_upperarm_twist", "l_arm_twist", "r_arm_twist",
-        "neck01", "neck02", "head"
+        "neck_01", "neck_02", "neck01", "neck02", "head"
     }
 
     with ArmatureModeGuard(face_armature_obj, 'EDIT'):
@@ -979,13 +1015,15 @@ def prune_face_rig_bones(face_armature_obj):
 def prune_body_rig_bones(body_armature_obj):
     """
     Prunes SKM_Body_Rig by deleting ALL facial expression bones parented under 'head',
-    preserving neck01 -> neck02 -> head.
+    preserving neck_01 -> neck_02 -> head.
     """
+    protected_body_bones = {"neck_01", "neck_02", "neck01", "neck02", "head", "spine_04", "pelvis", "root"}
+
     with ArmatureModeGuard(body_armature_obj, 'EDIT'):
         edit_bones = body_armature_obj.data.edit_bones
 
         for eb in list(edit_bones):
-            if eb.name == "head":
+            if eb.name in protected_body_bones:
                 continue
             if is_bone_or_ancestor_head(eb):
                 edit_bones.remove(eb)
