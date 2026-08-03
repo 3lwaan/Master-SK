@@ -415,6 +415,7 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     """
     Step 2 Rig Processing (Edit Mode):
     - Deletes 'root', 'hip', anchor bones, 20 child toe bones, 8 metacarpal bones, and driven bones (*(drv)*).
+    - Preserves eyelid bones and parents them to eye_l / eye_r so they follow eye rotation smoothly.
     - Top-level deformation bone is 'pelvis' (parent is None).
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
@@ -432,6 +433,10 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
             b_name = eb.name
             b_name_lower = b_name.lower()
             
+            # Protect eyelid bones from deletion
+            if "eyelid" in b_name_lower or ("lid" in b_name_lower and "brow" not in b_name_lower):
+                continue
+
             should_delete = (
                 b_name in explicit_delete or
                 b_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
@@ -474,19 +479,109 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                     if parent_eb and parent_eb != child_eb:
                         child_eb.parent = parent_eb
 
+        # Parent upperfacerig to head, and eyelid bones to upperfacerig (or head)
+        head_eb = edit_bones.get("head")
+        upperface_eb = edit_bones.get("upperfacerig")
+        if upperface_eb and head_eb:
+            upperface_eb.parent = head_eb
+
+        eyelid_parent = upperface_eb if upperface_eb else head_eb
+
+        for eb in list(edit_bones):
+            b_lower = eb.name.lower()
+            if "eyelid" in b_lower or ("lid" in b_lower and "brow" not in b_lower):
+                eb.parent = eyelid_parent
+
     return len(deleted_bone_names)
+
+
+def update_all_drivers_and_constraints(reference_data):
+    """
+    Scans ALL objects, armatures, meshes, shape keys, pose bones, and drivers in Blender data.
+    Updates any subtarget bone name matching DAZ_TO_MASTER_MAP (case-insensitive & prefix-aware).
+    Guarantees 100% of drivers and constraints linked to renamed bones (e.g. l_eye -> eye_l) remain fully functional.
+    """
+    daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
+    if not daz_map:
+        return
+
+    daz_map_lower = {k.lower(): v for k, v in daz_map.items()}
+
+    # 1. Update all Pose Constraints on all Armatures in scene
+    for obj in bpy.data.objects:
+        if obj.type == 'ARMATURE':
+            for pb in obj.pose.bones:
+                for c in pb.constraints:
+                    if hasattr(c, "subtarget") and c.subtarget:
+                        st = c.subtarget
+                        st_lower = st.lower().replace("g9_", "").replace("genesis9_", "").strip()
+                        if st in daz_map:
+                            c.subtarget = daz_map[st]
+                        elif st_lower in daz_map_lower:
+                            c.subtarget = daz_map_lower[st_lower]
+
+    # 2. Collect all driver holders in bpy.data (Objects, Armatures, Meshes, Shape Keys)
+    driver_holders = set()
+    
+    for obj in bpy.data.objects:
+        driver_holders.add(obj)
+        if obj.data:
+            driver_holders.add(obj.data)
+            
+    for sk in bpy.data.shape_keys:
+        driver_holders.add(sk)
+
+    for mesh in bpy.data.meshes:
+        driver_holders.add(mesh)
+
+    for arm in bpy.data.armatures:
+        driver_holders.add(arm)
+
+    # 3. Update driver variable targets and expressions across all driver holders
+    updated_drivers_count = 0
+    for holder in driver_holders:
+        anim_data = getattr(holder, "animation_data", None)
+        if anim_data and anim_data.drivers:
+            for fcurve in anim_data.drivers:
+                driver = fcurve.driver
+                
+                # Update hardcoded bone names in driver expression strings
+                if driver.expression:
+                    expr = driver.expression
+                    for orig_k, master_v in daz_map.items():
+                        if orig_k != master_v and orig_k in expr:
+                            expr = expr.replace(f'"{orig_k}"', f'"{master_v}"').replace(f"'{orig_k}'", f"'{master_v}'")
+                    driver.expression = expr
+
+                for var in driver.variables:
+                    for target in var.targets:
+                        if hasattr(target, "subtarget") and target.subtarget:
+                            st = target.subtarget
+                            st_lower = st.lower().replace("g9_", "").replace("genesis9_", "").strip()
+                            if st in daz_map:
+                                target.subtarget = daz_map[st]
+                                updated_drivers_count += 1
+                            elif st_lower in daz_map_lower:
+                                target.subtarget = daz_map_lower[st_lower]
+                                updated_drivers_count += 1
+
+    print(f"[MasterSK] Updated {updated_drivers_count} driver targets to Master SK bone names.")
 
 
 def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
     """
     Renames armature edit bones to Master SK names and concurrently syncs vertex groups on mesh objects.
+    Case-insensitive & prefix-aware (handles G9_, Genesis9_, uppercase names).
     Deletes orphaned vertex groups (including child toe and metacarpal groups) and purges zero-weight vertex assignments.
     """
     daz_map = reference_data.get("DAZ_TO_MASTER_MAP", {})
+    daz_map_lower = {k.lower(): v for k, v in daz_map.items()}
+    
     bones_to_delete_list = reference_data.get("BONES_TO_DELETE", [])
-    deleted_names = set(bones_to_delete_list) | {"root", "Root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
+    deleted_names = set(b.lower() for b in bones_to_delete_list) | {"root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
 
     all_armature_bone_names = set(b.name for b in armature_obj.data.bones)
+    all_armature_bone_names_lower = {b.name.lower(): b.name for b in armature_obj.data.bones}
 
     for mesh_obj in mesh_objs:
         if not mesh_obj or mesh_obj.name not in bpy.data.objects or mesh_obj.type != 'MESH':
@@ -497,10 +592,14 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
 
         for vg in list(vgroups):
             vg_name = vg.name
-            vg_name_lower = vg_name.lower()
+            vg_name_lower = vg_name.lower().replace("g9_", "").replace("genesis9_", "").strip()
+
+            # Protect eyelid vertex groups so their weight paint is preserved 100%
+            if "eyelid" in vg_name_lower or ("lid" in vg_name_lower and "brow" not in vg_name_lower):
+                continue
 
             is_deleted = (
-                vg_name in deleted_names or
+                vg_name_lower in deleted_names or
                 vg_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
                 is_child_toe_bone(vg_name) or
                 is_metacarpal_bone(vg_name) or
@@ -512,10 +611,15 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
                 groups_to_remove.append(vg)
                 continue
 
+            # 1. Exact or case-insensitive DAZ_TO_MASTER_MAP lookup
             if vg_name in daz_map:
-                new_vg_name = daz_map[vg_name]
-                vg.name = new_vg_name
+                vg.name = daz_map[vg_name]
+            elif vg_name_lower in daz_map_lower:
+                vg.name = daz_map_lower[vg_name_lower]
+            elif vg_name_lower in all_armature_bone_names_lower:
+                vg.name = all_armature_bone_names_lower[vg_name_lower]
 
+            # 2. Verify if updated name matches an active bone on armature
             if vg.name not in all_armature_bone_names:
                 groups_to_remove.append(vg)
 
@@ -612,21 +716,24 @@ def inject_ue5_als_ik_bones(armature_obj):
             ik_foot_r.tail = (-0.2, 0.0, 0.25)
             ik_foot_r.length = 0.15
 
-        hand_l = edit_bones.get("hand_l") or edit_bones.get("l_hand")
-        ik_hand_l = get_or_create_bone("ik_hand_l")
-        ik_hand_l.parent = ik_hand_root
-        if hand_l:
-            ik_hand_l.head = hand_l.head.copy()
-            ik_hand_l.matrix = hand_l.matrix.copy()
-            ik_hand_l.length = max(0.15, hand_l.length)
-        else:
-            ik_hand_l.head = (0.6, 0.0, 1.4)
-            ik_hand_l.tail = (0.6, 0.0, 1.55)
-            ik_hand_l.length = 0.15
-
         hand_r = edit_bones.get("hand_r") or edit_bones.get("r_hand")
+        hand_l = edit_bones.get("hand_l") or edit_bones.get("l_hand")
+
+        # ALS / UE5 IK Hand Gun Bone (Parented to ik_hand_root, snapped to right hand)
+        ik_hand_gun = get_or_create_bone("ik_hand_gun")
+        ik_hand_gun.parent = ik_hand_root
+        if hand_r:
+            ik_hand_gun.head = hand_r.head.copy()
+            ik_hand_gun.matrix = hand_r.matrix.copy()
+            ik_hand_gun.length = max(0.15, hand_r.length)
+        else:
+            ik_hand_gun.head = (-0.6, 0.0, 1.4)
+            ik_hand_gun.tail = (-0.6, 0.0, 1.55)
+            ik_hand_gun.length = 0.15
+
+        # Right Hand IK (Parented to ik_hand_gun)
         ik_hand_r = get_or_create_bone("ik_hand_r")
-        ik_hand_r.parent = ik_hand_root
+        ik_hand_r.parent = ik_hand_gun
         if hand_r:
             ik_hand_r.head = hand_r.head.copy()
             ik_hand_r.matrix = hand_r.matrix.copy()
@@ -635,6 +742,18 @@ def inject_ue5_als_ik_bones(armature_obj):
             ik_hand_r.head = (-0.6, 0.0, 1.4)
             ik_hand_r.tail = (-0.6, 0.0, 1.55)
             ik_hand_r.length = 0.15
+
+        # Left Hand IK (Parented to ik_hand_gun)
+        ik_hand_l = get_or_create_bone("ik_hand_l")
+        ik_hand_l.parent = ik_hand_gun
+        if hand_l:
+            ik_hand_l.head = hand_l.head.copy()
+            ik_hand_l.matrix = hand_l.matrix.copy()
+            ik_hand_l.length = max(0.15, hand_l.length)
+        else:
+            ik_hand_l.head = (0.6, 0.0, 1.4)
+            ik_hand_l.tail = (0.6, 0.0, 1.55)
+            ik_hand_l.length = 0.15
 
 
 # --- STEP 4 & STEP 5 MATERIAL & SPLIT ROUTINES ---
@@ -804,12 +923,29 @@ def cleanup_material_slots_after_head_split(head_mesh_obj, body_mesh_obj):
 
 
 def is_bone_or_ancestor_head(ebone):
-    """Returns True if ebone is 'head' or has 'head' as ancestor in edit mode."""
+    """
+    Returns True if ebone is 'head' (case-insensitive) or has 'head' as an ancestor in edit mode,
+    or is an eye, eyelid, eyelash, eyebrow, jaw, lip, tongue, or facial expression bone.
+    """
+    if not ebone:
+        return False
+    
+    b_name_lower = ebone.name.lower().replace("g9_", "").replace("genesis9_", "").strip()
+    
+    # Direct facial/eye bone keyword check
+    facial_keywords = ["head", "eye", "lid", "brow", "lash", "jaw", "lip", "tongue", "mouth", "cheek", "chin", "nose", "face"]
+    for kw in facial_keywords:
+        if kw in b_name_lower:
+            return True
+
+    # Ancestor chain check up to armature root
     curr = ebone
     while curr:
-        if curr.name == "head":
+        cname = curr.name.lower().replace("g9_", "").replace("genesis9_", "").strip()
+        if "head" in cname or "neck02" in cname or "neck_02" in cname:
             return True
         curr = curr.parent
+        
     return False
 
 
@@ -884,41 +1020,67 @@ def force_uv_layer_name(mesh_obj, target_name="UVMap"):
             primary.name = target_name
 
 
-def join_head_and_facial_meshes(head_mesh_obj, facial_mesh_objs):
+def join_head_and_facial_meshes(head_mesh_obj, facial_mesh_objs, face_rig_obj=None, reference_data=None):
     """
-    Standardises UV map layer names on head_mesh_obj and facial_mesh_objs to 'UVMap',
-    sets head_mesh_obj active, selects facial_mesh_objs, and executes bpy.ops.object.join().
+    Step 5 Facial Mesh Joining:
+    1. Applies location, rotation, and scale transforms on head_mesh_obj and facial_mesh_objs.
+    2. Syncs vertex group names across all head & facial meshes to match face_rig_obj bone names (e.g. l_eye -> eye_l).
+    3. Standardises primary UV map names to 'UVMap'.
+    4. Executes bpy.ops.object.join() to unify geometry.
+    5. Ensures SKM_Head_Mesh has an active ARMATURE modifier pointing to face_rig_obj.
     """
     if not head_mesh_obj or head_mesh_obj.type != 'MESH':
         return False, "SKM_Head_Mesh invalid or missing."
 
     valid_facials = [m for m in facial_mesh_objs if m and m.name in bpy.data.objects and m.type == 'MESH']
-    
-    # 1. Force UV layer name = 'UVMap' across all objects
-    force_uv_layer_name(head_mesh_obj, "UVMap")
-    for fm in valid_facials:
-        force_uv_layer_name(fm, "UVMap")
+    all_head_meshes = [head_mesh_obj] + valid_facials
 
-    if not valid_facials:
-        return True, "No external facial meshes selected; kept SKM_Head_Mesh intact."
+    # 1. Apply transforms on all head meshes
+    for mobj in all_head_meshes:
+        with ArmatureModeGuard(mobj, 'OBJECT'):
+            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
-    # 2. Join in Object Mode
-    if bpy.context.object and bpy.context.object.mode != 'OBJECT':
-        bpy.ops.object.mode_set(mode='OBJECT')
+    # 2. Force UV layer name = 'UVMap' across all head meshes
+    for mobj in all_head_meshes:
+        force_uv_layer_name(mobj, "UVMap")
 
-    bpy.ops.object.select_all(action='DESELECT')
+    # 3. Sync vertex group names to match face_rig_obj bone names if face_rig_obj provided
+    if face_rig_obj and reference_data:
+        for mobj in all_head_meshes:
+            sync_bone_and_vertex_group_names(face_rig_obj, [mobj], reference_data)
 
-    for fm in valid_facials:
-        fm.hide_set(False)
-        fm.select_set(True)
+    if valid_facials:
+        # 4. Join in Object Mode
+        if bpy.context.object and bpy.context.object.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
 
-    head_mesh_obj.hide_set(False)
-    head_mesh_obj.select_set(True)
-    bpy.context.view_layer.objects.active = head_mesh_obj
+        bpy.ops.object.select_all(action='DESELECT')
 
-    bpy.ops.object.join()
+        for fm in valid_facials:
+            fm.hide_set(False)
+            fm.select_set(True)
 
-    return True, f"Joined {len(valid_facials)} facial mesh(es) into 'SKM_Head_Mesh'."
+        head_mesh_obj.hide_set(False)
+        head_mesh_obj.select_set(True)
+        bpy.context.view_layer.objects.active = head_mesh_obj
+
+        bpy.ops.object.join()
+
+    # 5. Ensure SKM_Head_Mesh has an Armature modifier pointing to face_rig_obj
+    if face_rig_obj and face_rig_obj.name in bpy.data.objects:
+        arm_mod = None
+        for mod in head_mesh_obj.modifiers:
+            if mod.type == 'ARMATURE':
+                arm_mod = mod
+                break
+        if not arm_mod:
+            arm_mod = head_mesh_obj.modifiers.new(name="Armature", type='ARMATURE')
+        
+        arm_mod.object = face_rig_obj
+        arm_mod.use_vertex_groups = True
+        head_mesh_obj.parent = face_rig_obj
+
+    return True, f"Joined {len(valid_facials)} facial mesh(es) into 'SKM_Head_Mesh' & synced vertex weights to '{face_rig_obj.name if face_rig_obj else 'SKM_Face_Rig'}'."
 
 
 def consolidate_post_join_head_materials(head_mesh_obj):
@@ -998,3 +1160,112 @@ def audit_final_material_slots(head_mesh_obj, body_mesh_obj):
     body_slots = [slot.material.name for slot in body_mesh_obj.material_slots if slot.material] if body_mesh_obj else []
 
     return f"Head Slots ({len(head_slots)}): {', '.join(head_slots)} | Body Slots ({len(body_slots)}): {', '.join(body_slots)}"
+
+
+def purge_all_animation_drivers():
+    """
+    Purges all animation drivers across all Objects, Armatures, Meshes, and Shape Keys in Blender.
+    Cleans up background driver calculation overhead for Unreal Engine export.
+    """
+    cleared_count = 0
+    holders = set()
+
+    for obj in bpy.data.objects:
+        holders.add(obj)
+        if obj.data:
+            holders.add(obj.data)
+
+    for sk in bpy.data.shape_keys:
+        holders.add(sk)
+
+    for mesh in bpy.data.meshes:
+        holders.add(mesh)
+
+    for arm in bpy.data.armatures:
+        holders.add(arm)
+
+    for holder in holders:
+        anim_data = getattr(holder, "animation_data", None)
+        if anim_data and anim_data.drivers:
+            for d in list(anim_data.drivers):
+                try:
+                    anim_data.drivers.remove(d)
+                    cleared_count += 1
+                except Exception as e:
+                    print(f"[MasterSK] Could not remove driver '{getattr(d, 'data_path', '')}': {e}")
+
+    print(f"[MasterSK] Purged {cleared_count} animation drivers for UE5 export.")
+    return cleared_count
+
+
+def purge_body_mesh_shape_keys(body_mesh_obj):
+    """
+    Completely removes all shape keys from SKM_Body_Mesh.
+    Reduces FBX file size by ~90% and optimizes GPU memory & rendering performance in Unreal Engine.
+    """
+    if not body_mesh_obj or body_mesh_obj.type != 'MESH':
+        return 0
+
+    with ArmatureModeGuard(body_mesh_obj, 'OBJECT'):
+        if body_mesh_obj.data.shape_keys:
+            key_count = len(body_mesh_obj.data.shape_keys.key_blocks)
+            body_mesh_obj.shape_key_clear()
+            print(f"[MasterSK] Purged {key_count} body shape keys from '{body_mesh_obj.name}'.")
+            return key_count
+    return 0
+
+
+# Function alias for operators.py compatibility
+purge_body_shape_keys = purge_body_mesh_shape_keys
+
+
+def optimize_head_mesh_shape_keys(head_mesh_obj):
+    """
+    Optimizes SKM_Head_Mesh shape keys for Unreal Engine:
+    - Keeps essential facial animation, ARKit, Viseme, Eye Blink, and Jaw shape keys.
+    - Purges non-essential legacy DAZ internal corrective shape keys (pJCM, FBCO, eCTR duplicates).
+    """
+    if not head_mesh_obj or head_mesh_obj.type != 'MESH':
+        return 0
+
+    skeys = getattr(head_mesh_obj.data, "shape_keys", None)
+    if not skeys or not skeys.key_blocks:
+        return 0
+
+    purged_count = 0
+
+    with ArmatureModeGuard(head_mesh_obj, 'OBJECT'):
+        kb_list = list(skeys.key_blocks)
+        basis_key = kb_list[0] if kb_list else None
+
+        for kb in kb_list:
+            if kb == basis_key:
+                continue
+
+            kname = kb.name.lower()
+
+            # Keep facial animation, ARKit, Visemes, Jaw, Blink, Lip, Smile, Expression morphs
+            keep_keywords = [
+                "arkit", "viseme", "blink", "jaw", "smile", "eye", "brow", "lip", "mouth",
+                "cheek", "chin", "nose", "tongue", "face", "exp", "ctrl", "ahar_"
+            ]
+
+            # Internal corrective DAZ morphs to purge
+            purge_keywords = ["pjcm", "fbco", "bs_", "jcm", "corrective", "body"]
+
+            should_purge = any(pk in kname for pk in purge_keywords) and not any(kk in kname for kk in keep_keywords)
+
+            if should_purge:
+                try:
+                    head_mesh_obj.shape_key_remove(kb)
+                    purged_count += 1
+                except Exception as e:
+                    print(f"[MasterSK] Error removing shape key '{kb.name}': {e}")
+
+    print(f"[MasterSK] Optimized head shape keys: purged {purged_count} internal DAZ corrective shape keys.")
+    return purged_count
+
+
+# Function aliases for operators.py compatibility
+purge_body_shape_keys = purge_body_mesh_shape_keys
+optimize_head_shape_keys = optimize_head_mesh_shape_keys

@@ -104,7 +104,7 @@ class MSK_PT_main_panel(bpy.types.Panel):
         step4_box = layout.box()
         s4_row = step4_box.row(align=True)
         s4_icon = 'CHECKMARK' if props.step4_completed else 'RADIOBUT_OFF'
-        s4_row.label(text="Step 4: Modular Head & Face Split", icon=s4_icon)
+        s4_row.label(text="Step 4: Modular Head & Body Split", icon=s4_icon)
 
         g4_col = step4_box.column(align=True)
         g4_col.scale_y = 0.8

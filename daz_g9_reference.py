@@ -28,6 +28,82 @@ DAZ_TO_MASTER_MAP = {
     "neck_02": "neck02",
     "head": "head",
     
+    # Eye Bones (UE5 Standard: eye_l / eye_r)
+    "l_eye": "eye_l",
+    "r_eye": "eye_r",
+    "leye": "eye_l",
+    "reye": "eye_r",
+    "lEye": "eye_l",
+    "rEye": "eye_r",
+    "left_eye": "eye_l",
+    "right_eye": "eye_r",
+    "l_eye_master": "eye_l",
+    "r_eye_master": "eye_r",
+    "eye_l": "eye_l",
+    "eye_r": "eye_r",
+
+    # DAZ Genesis 9 Facial Expression Rig & Eyelid/Eyelash Variants
+    "upperteeth": "upperteeth",
+    "upperfacerig": "upperfacerig",
+    "l_browinner": "l_browinner",
+    "l_browouter": "l_browouter",
+    "r_browinner": "r_browinner",
+    "r_browouter": "r_browouter",
+    "centerbrow": "centerbrow",
+    "l_eyelidupper(drv)": "l_eyelidupper(drv)",
+    "l_eyelidlower(drv)": "l_eyelidlower(drv)",
+    "r_eyelidupper(drv)": "r_eyelidupper(drv)",
+    "r_eyelidlower(drv)": "r_eyelidlower(drv)",
+    "l_squint": "l_squint",
+    "r_squint": "r_squint",
+    "l_cheek": "l_cheek",
+    "r_cheek": "r_cheek",
+    "l_nostril": "l_nostril",
+    "r_nostril": "r_nostril",
+    "l_infraorbital": "l_infraorbital",
+    "r_infraorbital": "r_infraorbital",
+    "l_eyelidupper": "l_eyelidupper",
+    "l_eyelidlower": "l_eyelidlower",
+    "r_eyelidupper": "r_eyelidupper",
+    "r_eyelidlower": "r_eyelidlower",
+    "l_eyelid_upper": "l_eyelidupper",
+    "l_eyelid_lower": "l_eyelidlower",
+    "r_eyelid_upper": "r_eyelidupper",
+    "r_eyelid_lower": "r_eyelidlower",
+    "leyelidupper": "l_eyelidupper",
+    "leyelidlower": "l_eyelidlower",
+    "reyelidupper": "r_eyelidupper",
+    "reyelidlower": "r_eyelidlower",
+    "l_eyelid_up": "l_eyelidupper",
+    "l_eyelid_low": "l_eyelidlower",
+    "r_eyelid_up": "r_eyelidupper",
+    "r_eyelid_low": "r_eyelidlower",
+    "l_eyelash": "l_eyelash",
+    "r_eyelash": "r_eyelash",
+    "leyelash": "l_eyelash",
+    "reyelash": "r_eyelash",
+    "lipuppermiddle": "lipuppermiddle",
+    "l_lipupper": "l_lipupper",
+    "r_lipupper": "r_lipupper",
+    "l_ear": "l_ear",
+    "r_ear": "r_ear",
+    "lowerjaw": "lowerjaw",
+    "lowerteeth": "lowerteeth",
+    "tongue01": "tongue01",
+    "tongue02": "tongue02",
+    "tongue03": "tongue03",
+    "tongue04": "tongue04",
+    "tongue05": "tongue05",
+    "lowerfacerig": "lowerfacerig",
+    "chin": "chin",
+    "l_lipcorner": "l_lipcorner",
+    "l_liplower": "l_liplower",
+    "liplowermiddle": "liplowermiddle",
+    "r_liplower": "r_liplower",
+    "r_lipcorner": "r_lipcorner",
+    "l_cheeklower": "l_cheeklower",
+    "r_cheeklower": "r_cheeklower",
+
     # Pectorals
     "l_pectoral": "pectoral_l",
     "r_pectoral": "pectoral_r",
@@ -62,7 +138,7 @@ DAZ_TO_MASTER_MAP = {
     "r_forearmtwist1": "lowerarm_twist_01_r",
     "r_forearmtwist2": "lowerarm_twist_02_r",
 
-    # Left Hand Fingers (Finger 01 bones parented directly to hand_l)
+    # Left Hand Fingers
     "l_thumb1": "thumb_01_l",
     "l_thumb2": "thumb_02_l",
     "l_thumb3": "thumb_03_l",
@@ -79,7 +155,7 @@ DAZ_TO_MASTER_MAP = {
     "l_pinky2": "pinky_02_l",
     "l_pinky3": "pinky_03_l",
 
-    # Right Hand Fingers (Finger 01 bones parented directly to hand_r)
+    # Right Hand Fingers
     "r_thumb1": "thumb_01_r",
     "r_thumb2": "thumb_02_r",
     "r_thumb3": "thumb_03_r",
@@ -125,13 +201,13 @@ MASTER_SK_HIERARCHY = {
     # Top-Level Deformation Bone
     "pelvis": None,
     
-    # Spine Chain (under pelvis)
+    # Spine Chain
     "spine_01": "pelvis",
     "spine_02": "spine_01",
     "spine_03": "spine_02",
     "spine_04": "spine_03",
     
-    # Legs (under pelvis)
+    # Legs
     "thigh_l": "pelvis",
     "thigh_twist_01_l": "thigh_l",
     "thigh_twist_02_l": "thigh_twist_01_l",
@@ -146,16 +222,68 @@ MASTER_SK_HIERARCHY = {
     "foot_r": "calf_r",
     "toes_r": "foot_r",
     
-    # Pectorals (parented to spine_03)
+    # Pectorals
     "pectoral_l": "spine_03",
     "pectoral_r": "spine_03",
 
-    # Neck & Head (parented to spine_04)
+    # Neck & Head
     "neck01": "spine_04",
     "neck02": "neck01",
     "head": "neck02",
+    "eye_l": "head",
+    "eye_r": "head",
+    "l_ear": "head",
+    "r_ear": "head",
+    "upperteeth": "head",
+    "upperfacerig": "head",
 
-    # Clavicles & Arms (parented to spine_04)
+    # Upper Face Rig Children
+    "l_browinner": "upperfacerig",
+    "l_browouter": "upperfacerig",
+    "r_browinner": "upperfacerig",
+    "r_browouter": "upperfacerig",
+    "centerbrow": "upperfacerig",
+    "l_eyelidupper(drv)": "upperfacerig",
+    "l_eyelidlower(drv)": "upperfacerig",
+    "r_eyelidupper(drv)": "upperfacerig",
+    "r_eyelidlower(drv)": "upperfacerig",
+    "l_squint": "upperfacerig",
+    "r_squint": "upperfacerig",
+    "l_cheek": "upperfacerig",
+    "r_cheek": "upperfacerig",
+    "l_nostril": "upperfacerig",
+    "r_nostril": "upperfacerig",
+    "l_infraorbital": "upperfacerig",
+    "r_infraorbital": "upperfacerig",
+    "l_eyelidupper": "upperfacerig",
+    "l_eyelidlower": "upperfacerig",
+    "r_eyelidupper": "upperfacerig",
+    "r_eyelidlower": "upperfacerig",
+    "lipuppermiddle": "upperfacerig",
+    "l_lipupper": "upperfacerig",
+    "r_lipupper": "upperfacerig",
+
+    # Lower Jaw & Teeth / Tongue
+    "lowerjaw": "head",
+    "lowerteeth": "lowerjaw",
+    "tongue01": "lowerteeth",
+    "tongue02": "tongue01",
+    "tongue03": "tongue02",
+    "tongue04": "tongue03",
+    "tongue05": "tongue04",
+
+    # Lower Face Rig & Children
+    "lowerfacerig": "lowerjaw",
+    "chin": "lowerfacerig",
+    "l_lipcorner": "lowerfacerig",
+    "l_liplower": "lowerfacerig",
+    "liplowermiddle": "lowerfacerig",
+    "r_liplower": "lowerfacerig",
+    "r_lipcorner": "lowerfacerig",
+    "l_cheeklower": "lowerfacerig",
+    "r_cheeklower": "lowerfacerig",
+
+    # Clavicles & Arms
     "clavicle_l": "spine_04",
     "upperarm_l": "clavicle_l",
     "upperarm_twist_01_l": "upperarm_l",
@@ -174,7 +302,7 @@ MASTER_SK_HIERARCHY = {
     "lowerarm_twist_02_r": "lowerarm_twist_01_r",
     "hand_r": "lowerarm_r",
 
-    # Left Hand Fingers (parented directly to hand_l)
+    # Left Hand Fingers
     "thumb_01_l": "hand_l",
     "thumb_02_l": "thumb_01_l",
     "thumb_03_l": "thumb_02_l",
@@ -191,7 +319,7 @@ MASTER_SK_HIERARCHY = {
     "pinky_02_l": "pinky_01_l",
     "pinky_03_l": "pinky_02_l",
     
-    # Right Hand Fingers (parented directly to hand_r)
+    # Right Hand Fingers
     "thumb_01_r": "hand_r",
     "thumb_02_r": "thumb_01_r",
     "thumb_03_r": "thumb_02_r",
@@ -208,13 +336,14 @@ MASTER_SK_HIERARCHY = {
     "pinky_02_r": "pinky_01_r",
     "pinky_03_r": "pinky_02_r",
 
-    # Top-Level IK Roots
+    # Top-Level IK Roots (ALS / UE5 Standard)
     "ik_foot_root": None,
     "ik_foot_l": "ik_foot_root",
     "ik_foot_r": "ik_foot_root",
     "ik_hand_root": None,
-    "ik_hand_l": "ik_hand_root",
-    "ik_hand_r": "ik_hand_root",
+    "ik_hand_gun": "ik_hand_root",
+    "ik_hand_l": "ik_hand_gun",
+    "ik_hand_r": "ik_hand_gun",
 }
 
 BONES_TO_DELETE = [

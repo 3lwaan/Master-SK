@@ -12,6 +12,7 @@ from .rig_utils import (
     merge_child_toe_weights_to_toes,
     merge_metacarpal_weights_to_hands,
     purge_bones_and_restructure_hierarchy,
+    update_all_drivers_and_constraints,
     sync_bone_and_vertex_group_names,
     inject_ue5_als_ik_bones,
     consolidate_pre_split_materials,
@@ -19,6 +20,9 @@ from .rig_utils import (
     prune_face_rig_bones,
     prune_body_rig_bones,
     purge_orphaned_vgroups_for_split,
+    purge_all_animation_drivers,
+    purge_body_shape_keys,
+    optimize_head_shape_keys,
     join_head_and_facial_meshes,
     consolidate_post_join_head_materials,
     audit_final_material_slots,
@@ -111,6 +115,9 @@ class MSK_OT_process_rig_vertex_groups(bpy.types.Operator):
             # 9. Synchronized Vertex Group Renaming & Cleanup
             sync_bone_and_vertex_group_names(armature_obj, mesh_objs, ref_data)
 
+            # 10. Update subtarget bone names across all drivers & constraints (e.g. l_eye -> eye_l)
+            update_all_drivers_and_constraints(ref_data)
+
             props.step2_completed = True
             msg = f"Step 2 Complete: Restructured '{armature_obj.name}', purged {deleted_count} bones & transferred metacarpal/toe weights."
             props.status_message = msg
@@ -165,7 +172,7 @@ class MSK_OT_inject_ik_bones(bpy.types.Operator):
 class MSK_OT_separate_head_modularize(bpy.types.Operator):
     """Consolidate pre-split materials, separate head geometry, split armatures into SKM_Body_Rig and SKM_Face_Rig, and purge orphaned weights."""
     bl_idname = "master_sk.separate_head_modularize"
-    bl_label = "4. Separate Head & Modularize Rigs"
+    bl_label = "4. Modular Head & Body Rig Separator"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -181,6 +188,9 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
         target_mesh = mesh_objs[0]
 
         try:
+            ref_path = props.custom_reference_path if props.use_custom_reference else None
+            ref_data = load_reference_data(ref_path)
+
             # Step 4.0: Consolidate Pre-Split Material Slots (Mouth Cavity -> Head, Nails -> Arms)
             pre_split_mat_logs = consolidate_pre_split_materials(target_mesh)
             if pre_split_mat_logs:
@@ -207,6 +217,7 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
 
             # Step 4.3: Prune SKM_Face_Rig & setup SKM_Head_Mesh
             prune_face_rig_bones(face_rig)
+            sync_bone_and_vertex_group_names(face_rig, [head_mesh], ref_data)
             
             for mod in list(head_mesh.modifiers):
                 if mod.type == 'ARMATURE':
@@ -216,6 +227,7 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
 
             # Step 4.4: Prune SKM_Body_Rig & setup SKM_Body_Mesh
             prune_body_rig_bones(body_rig)
+            sync_bone_and_vertex_group_names(body_rig, [body_mesh], ref_data)
             
             for mod in list(body_mesh.modifiers):
                 if mod.type == 'ARMATURE':
@@ -226,15 +238,20 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
             head_mesh.parent = face_rig
             body_mesh.parent = body_rig
 
+            # Step 4.5: Purge Drivers & Optimize Shape Keys for UE5 Export
+            d_cleared = purge_all_animation_drivers()
+            body_sk_cleared = purge_body_shape_keys(body_mesh)
+            head_sk_optimized = optimize_head_shape_keys(head_mesh)
+
             # Auto-fill target pointers for Step 5
             props.target_head_armature = face_rig
             props.target_head_mesh = head_mesh
 
             props.step4_completed = True
-            msg = "Step 4 Complete: Separated head & created 'SKM_Body_Rig' & 'SKM_Face_Rig'."
+            msg = "Step 4 Complete: Modularized head & body rigs, purged drivers, and optimized shape keys for UE5."
             props.status_message = msg
             
-            add_audit_log_entry(context, "Step 4", f"Separated SKM_Head_Mesh and SKM_Body_Mesh; pruned SKM_Face_Rig & SKM_Body_Rig.", "SUCCESS", "CHECKMARK")
+            add_audit_log_entry(context, "Step 4", f"Separated SKM_Head_Mesh & SKM_Body_Mesh. Purged {d_cleared} drivers, {body_sk_cleared} body shape keys & optimized head morphs.", "SUCCESS", "CHECKMARK")
             self.report({'INFO'}, msg)
             return {'FINISHED'}
 
@@ -255,9 +272,10 @@ class MSK_OT_join_facial_meshes(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.master_sk_props
 
-        # Resolve Head Mesh
+        # Resolve Head Mesh & Face Rig
         head_mesh = props.target_head_mesh or bpy.data.objects.get("SKM_Head_Mesh")
         body_mesh = props.target_body_mesh or bpy.data.objects.get("SKM_Body_Mesh")
+        face_rig = props.target_head_armature or bpy.data.objects.get("SKM_Face_Rig")
 
         if not head_mesh or head_mesh.type != 'MESH':
             self.report({'ERROR'}, "Target SKM_Head_Mesh not found or invalid.")
@@ -266,6 +284,9 @@ class MSK_OT_join_facial_meshes(bpy.types.Operator):
             return {'CANCELLED'}
 
         try:
+            ref_path = props.custom_reference_path if props.use_custom_reference else None
+            ref_data = load_reference_data(ref_path)
+
             # Collect external facial meshes from properties or search fallback
             facial_objs = []
             for prop_obj in [props.target_eyes_mesh, props.target_eyelashes_mesh, props.target_mouth_mesh]:
@@ -280,8 +301,8 @@ class MSK_OT_join_facial_meshes(bpy.types.Operator):
                         if any(k in oname for k in ["eye", "eyelash", "mouth", "teeth"]):
                             facial_objs.append(obj)
 
-            # Step 5.1 & 5.2: UV Standardisation & Joining
-            success, join_msg = join_head_and_facial_meshes(head_mesh, facial_objs)
+            # Step 5.1 & 5.2: Apply Transforms, Sync Weights to Face Rig, UV Standardisation & Joining
+            success, join_msg = join_head_and_facial_meshes(head_mesh, facial_objs, face_rig, ref_data)
             add_audit_log_entry(context, "Step 5", join_msg, "INFO", "INFO")
 
             # Step 5.3: Post-Join Material Consolidation (Teeth -> Mouth, EyeMoisture -> Eyes)
