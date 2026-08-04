@@ -4,6 +4,8 @@ from .rig_utils import (
     add_audit_log_entry,
     validate_selection,
     apply_transforms,
+    setup_male_variant_rig_and_mesh,
+    setup_female_variant_rig_and_mesh,
     rename_armature_and_datablock,
     purge_all_bone_collections,
     clear_pelvis_constraints,
@@ -207,6 +209,8 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
             # Step 4.2: Duplicate Armature to create SKM_Body_Rig and SKM_Face_Rig
             body_rig = armature_obj
             body_rig.name = "SKM_Body_Rig"
+            if body_rig.data:
+                body_rig.data.name = "SKM_Body_Rig"
 
             bpy.ops.object.select_all(action='DESELECT')
             body_rig.select_set(True)
@@ -214,6 +218,9 @@ class MSK_OT_separate_head_modularize(bpy.types.Operator):
             bpy.ops.object.duplicate()
             face_rig = bpy.context.view_layer.objects.active
             face_rig.name = "SKM_Face_Rig"
+            if face_rig.data:
+                face_rig.data = body_rig.data.copy()
+                face_rig.data.name = "SKM_Face_Rig"
 
             # Step 4.3: Prune SKM_Face_Rig & setup SKM_Head_Mesh
             prune_face_rig_bones(face_rig)
@@ -372,8 +379,82 @@ class MSK_OT_reset_progress(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MSK_OT_setup_male(bpy.types.Operator):
+    """Deletes pectoral bones and purges pectoral vertex groups for male character variants."""
+    bl_idname = "master_sk.setup_male"
+    bl_label = "Set Up Male Variant"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.master_sk_props
+        armature_obj, mesh_objs, err_msg = validate_selection(context)
+        if not armature_obj or not mesh_objs:
+            self.report({'ERROR'}, "Please select both the Armature and Character Mesh.")
+            props.status_message = "Error: Selection invalid for Male Variant Setup."
+            add_audit_log_entry(context, "Gender Setup", "Selection invalid for Male Setup.", "ERROR", "ERROR")
+            return {'CANCELLED'}
+
+        try:
+            success, msg = setup_male_variant_rig_and_mesh(armature_obj, mesh_objs)
+            if not success:
+                self.report({'ERROR'}, msg)
+                props.status_message = f"Error: {msg}"
+                add_audit_log_entry(context, "Gender Setup", msg, "ERROR", "ERROR")
+                return {'CANCELLED'}
+
+            props.status_message = msg
+            add_audit_log_entry(context, "Gender Setup", "Male variant configured: Pectoral bones & vertex groups removed.", "SUCCESS", "USER")
+            self.report({'INFO'}, msg)
+            return {'FINISHED'}
+
+        except Exception as e:
+            err_text = f"Error configuring male variant: {str(e)}"
+            self.report({'ERROR'}, err_text)
+            props.status_message = f"Error: {err_text}"
+            add_audit_log_entry(context, "Gender Setup", err_text, "ERROR", "ERROR")
+            return {'CANCELLED'}
+
+
+class MSK_OT_setup_female(bpy.types.Operator):
+    """Retains pectoral bones and injects glute_l/r bones with generated vertex weights for female character variants."""
+    bl_idname = "master_sk.setup_female"
+    bl_label = "Set Up Female Variant"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.master_sk_props
+        armature_obj, mesh_objs, err_msg = validate_selection(context)
+        if not armature_obj or not mesh_objs:
+            self.report({'ERROR'}, "Please select both the Armature and Character Mesh.")
+            props.status_message = "Error: Selection invalid for Female Variant Setup."
+            add_audit_log_entry(context, "Gender Setup", "Selection invalid for Female Setup.", "ERROR", "ERROR")
+            return {'CANCELLED'}
+
+        try:
+            success, msg = setup_female_variant_rig_and_mesh(armature_obj, mesh_objs)
+            if not success:
+                self.report({'ERROR'}, msg)
+                props.status_message = f"Error: {msg}"
+                add_audit_log_entry(context, "Gender Setup", msg, "ERROR", "ERROR")
+                return {'CANCELLED'}
+
+            props.status_message = msg
+            add_audit_log_entry(context, "Gender Setup", "Female variant configured: Glute bones injected and weights generated.", "SUCCESS", "USER")
+            self.report({'INFO'}, msg)
+            return {'FINISHED'}
+
+        except Exception as e:
+            err_text = f"Error configuring female variant: {str(e)}"
+            self.report({'ERROR'}, err_text)
+            props.status_message = f"Error: {err_text}"
+            add_audit_log_entry(context, "Gender Setup", err_text, "ERROR", "ERROR")
+            return {'CANCELLED'}
+
+
 classes = (
     MSK_OT_prepare_character,
+    MSK_OT_setup_male,
+    MSK_OT_setup_female,
     MSK_OT_process_rig_vertex_groups,
     MSK_OT_inject_ik_bones,
     MSK_OT_separate_head_modularize,
@@ -389,3 +470,4 @@ def register_operators():
 def unregister_operators():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+

@@ -1,7 +1,82 @@
 import bpy
+import math
 import mathutils
 import fnmatch
 from datetime import datetime
+
+
+def _strip_bone_prefix(name):
+    """Return a normalized DAZ bone name without common Genesis 9 prefixes."""
+    normalized = str(name).lower().strip()
+    for prefix in ("genesis9_", "g9_"):
+        if normalized.startswith(prefix):
+            return normalized[len(prefix):]
+    return normalized
+
+
+def _mapped_bone_name(name, daz_map, daz_map_lower=None):
+    """Resolve a bone name case-insensitively, including G9_/Genesis9_ prefixes."""
+    if not daz_map:
+        return None
+    if daz_map_lower is None:
+        daz_map_lower = {str(key).lower(): value for key, value in daz_map.items()}
+
+    if name in daz_map:
+        return daz_map[name]
+
+    normalized = str(name).lower()
+    if normalized in daz_map_lower:
+        return daz_map_lower[normalized]
+
+    stripped = _strip_bone_prefix(name)
+    return daz_map_lower.get(stripped)
+
+
+def _find_edit_bone(edit_bones, *names):
+    """Find an edit bone using exact, case-insensitive, and prefixed aliases."""
+    for name in names:
+        bone = edit_bones.get(name)
+        if bone:
+            return bone
+
+    by_normalized_name = {
+        _strip_bone_prefix(bone.name): bone for bone in edit_bones
+    }
+    for name in names:
+        bone = by_normalized_name.get(_strip_bone_prefix(name))
+        if bone:
+            return bone
+    return None
+
+
+def _find_vertex_group(mesh_obj, *names):
+    """Find a vertex group using exact, case-insensitive, and prefixed aliases."""
+    for name in names:
+        group = mesh_obj.vertex_groups.get(name)
+        if group:
+            return group
+
+    by_normalized_name = {
+        _strip_bone_prefix(group.name): group for group in mesh_obj.vertex_groups
+    }
+    for name in names:
+        group = by_normalized_name.get(_strip_bone_prefix(name))
+        if group:
+            return group
+    return None
+
+
+def _distance_to_segment(point, segment_start, segment_end):
+    """Return the shortest distance from a point to a line segment."""
+    segment = segment_end - segment_start
+    segment_length_squared = segment.length_squared
+    if segment_length_squared <= 1.0e-12:
+        return (point - segment_start).length
+
+    t = max(0.0, min(1.0, (point - segment_start).dot(segment) / segment_length_squared))
+    closest = segment_start + segment * t
+    return (point - closest).length
+
 
 class ArmatureModeGuard:
     """
@@ -13,14 +88,21 @@ class ArmatureModeGuard:
         self.target_mode = target_mode
         self.original_active = None
         self.original_mode = 'OBJECT'
+        self.original_selected = []
 
     def __enter__(self):
         if bpy.context.view_layer:
             self.original_active = bpy.context.view_layer.objects.active
+            self.original_selected = list(bpy.context.selected_objects)
         if bpy.context.object:
             self.original_mode = bpy.context.object.mode
 
         if self.target_obj and bpy.context.view_layer:
+            if bpy.context.object and bpy.context.object != self.target_obj and bpy.context.object.mode != 'OBJECT':
+                bpy.ops.object.mode_set(mode='OBJECT')
+
+            for obj in bpy.context.selected_objects:
+                obj.select_set(False)
             self.target_obj.hide_set(False)
             self.target_obj.select_set(True)
             bpy.context.view_layer.objects.active = self.target_obj
@@ -31,10 +113,19 @@ class ArmatureModeGuard:
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             if self.target_obj and self.target_obj.name in bpy.data.objects:
-                if self.target_obj.mode != self.original_mode:
+                if self.target_obj.mode != 'OBJECT':
                     bpy.ops.object.mode_set(mode='OBJECT')
+
+            for obj in bpy.context.selected_objects:
+                obj.select_set(False)
+            for obj in self.original_selected:
+                if obj and obj.name in bpy.data.objects:
+                    obj.select_set(True)
+
             if self.original_active and self.original_active.name in bpy.data.objects:
                 bpy.context.view_layer.objects.active = self.original_active
+                if self.original_mode != 'OBJECT' and self.original_active.mode != self.original_mode:
+                    bpy.ops.object.mode_set(mode=self.original_mode)
         except Exception as e:
             print(f"[MasterSK ModeGuard] Exception during mode restoration: {e}")
         return False
@@ -207,7 +298,7 @@ def merge_hip_weights_to_pelvis(mesh_objs):
 
 def is_child_toe_bone(b_name):
     """Returns True for any of the 20 individual child toe bones (DAZ or UE5 names) while retaining toes_l/r / l_toes/r_toes."""
-    name_lower = b_name.lower()
+    name_lower = _strip_bone_prefix(b_name)
     if name_lower in ["toes_l", "toes_r", "l_toes", "r_toes", "ltoe", "rtoe", "ball_l", "ball_r"]:
         return False
 
@@ -402,18 +493,20 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
         edit_bones = armature_obj.data.edit_bones
 
         explicit_delete = set(bones_to_delete_list) | {"root", "Root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
+        explicit_delete_normalized = {_strip_bone_prefix(name) for name in explicit_delete}
+        daz_map_lower = {str(key).lower(): value for key, value in daz_map.items()}
         
         for eb in list(edit_bones):
             b_name = eb.name
             b_name_lower = b_name.lower()
             
-            # Protect eyelid bones from deletion
-            if "eyelid" in b_name_lower or ("lid" in b_name_lower and "brow" not in b_name_lower):
+            # Protect eyelid and glute bones from deletion
+            if "eyelid" in b_name_lower or ("lid" in b_name_lower and "brow" not in b_name_lower) or "glute" in b_name_lower:
                 continue
 
             should_delete = (
                 b_name in explicit_delete or
-                b_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
+                _strip_bone_prefix(b_name) in explicit_delete_normalized or
                 is_child_toe_bone(b_name) or
                 is_metacarpal_bone(b_name) or
                 "(drv)" in b_name_lower or
@@ -426,12 +519,12 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
 
         for eb in list(edit_bones):
             orig_name = eb.name
-            if orig_name in daz_map:
-                target_name = daz_map[orig_name]
-                if orig_name != target_name:
-                    if target_name in edit_bones and edit_bones[target_name] != eb:
-                        edit_bones.remove(edit_bones[target_name])
-                    eb.name = target_name
+            target_name = _mapped_bone_name(orig_name, daz_map, daz_map_lower)
+            if target_name and orig_name != target_name:
+                existing_target = edit_bones.get(target_name)
+                if existing_target and existing_target != eb:
+                    edit_bones.remove(existing_target)
+                eb.name = target_name
 
         pelvis_eb = edit_bones.get("pelvis")
         if pelvis_eb:
@@ -481,18 +574,30 @@ def update_all_drivers_and_constraints(reference_data):
 
     daz_map_lower = {k.lower(): v for k, v in daz_map.items()}
 
-    # 1. Update all Pose Constraints on all Armatures in scene
+    def mapped_subtarget(subtarget):
+        if not subtarget:
+            return None
+        return _mapped_bone_name(subtarget, daz_map, daz_map_lower)
+
+    def update_constraint(constraint):
+        if not hasattr(constraint, "subtarget") or not constraint.subtarget:
+            return
+        target_name = mapped_subtarget(constraint.subtarget)
+        if target_name and target_name != constraint.subtarget:
+            try:
+                constraint.subtarget = target_name
+            except Exception as e:
+                print(f"[MasterSK] Could not update constraint subtarget '{constraint.subtarget}': {e}")
+
+    # 1. Update object-level and pose-bone constraints on all Armatures in scene.
     for obj in bpy.data.objects:
+        for constraint in obj.constraints:
+            update_constraint(constraint)
+
         if obj.type == 'ARMATURE':
             for pb in obj.pose.bones:
                 for c in pb.constraints:
-                    if hasattr(c, "subtarget") and c.subtarget:
-                        st = c.subtarget
-                        st_lower = st.lower().replace("g9_", "").replace("genesis9_", "").strip()
-                        if st in daz_map:
-                            c.subtarget = daz_map[st]
-                        elif st_lower in daz_map_lower:
-                            c.subtarget = daz_map_lower[st_lower]
+                    update_constraint(c)
 
     # 2. Collect all driver holders in bpy.data (Objects, Armatures, Meshes, Shape Keys)
     driver_holders = set()
@@ -531,12 +636,9 @@ def update_all_drivers_and_constraints(reference_data):
                     for target in var.targets:
                         if hasattr(target, "subtarget") and target.subtarget:
                             st = target.subtarget
-                            st_lower = st.lower().replace("g9_", "").replace("genesis9_", "").strip()
-                            if st in daz_map:
-                                target.subtarget = daz_map[st]
-                                updated_drivers_count += 1
-                            elif st_lower in daz_map_lower:
-                                target.subtarget = daz_map_lower[st_lower]
+                            target_name = mapped_subtarget(st)
+                            if target_name and target_name != st:
+                                target.subtarget = target_name
                                 updated_drivers_count += 1
 
     print(f"[MasterSK] Updated {updated_drivers_count} driver targets to Master SK bone names.")
@@ -552,10 +654,14 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
     daz_map_lower = {k.lower(): v for k, v in daz_map.items()}
     
     bones_to_delete_list = reference_data.get("BONES_TO_DELETE", [])
-    deleted_names = set(b.lower() for b in bones_to_delete_list) | {"root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
+    deleted_names = {
+        _strip_bone_prefix(name) for name in bones_to_delete_list
+    } | {"root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"}
 
     all_armature_bone_names = set(b.name for b in armature_obj.data.bones)
-    all_armature_bone_names_lower = {b.name.lower(): b.name for b in armature_obj.data.bones}
+    all_armature_bone_names_lower = {
+        _strip_bone_prefix(b.name): b.name for b in armature_obj.data.bones
+    }
 
     for mesh_obj in mesh_objs:
         if not mesh_obj or mesh_obj.name not in bpy.data.objects or mesh_obj.type != 'MESH':
@@ -566,10 +672,10 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
 
         for vg in list(vgroups):
             vg_name = vg.name
-            vg_name_lower = vg_name.lower().replace("g9_", "").replace("genesis9_", "").strip()
+            vg_name_lower = _strip_bone_prefix(vg_name)
 
-            # Protect eyelid vertex groups so their weight paint is preserved 100%
-            if "eyelid" in vg_name_lower or ("lid" in vg_name_lower and "brow" not in vg_name_lower):
+            # Protect eyelid and glute vertex groups so their weight paint is preserved 100%
+            if "eyelid" in vg_name_lower or ("lid" in vg_name_lower and "brow" not in vg_name_lower) or "glute" in vg_name_lower:
                 continue
 
             is_deleted = (
@@ -586,12 +692,12 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
                 continue
 
             # 1. Exact or case-insensitive DAZ_TO_MASTER_MAP lookup
-            if vg_name in daz_map:
+            if vg_name_lower in all_armature_bone_names_lower:
+                vg.name = all_armature_bone_names_lower[vg_name_lower]
+            elif vg_name in daz_map:
                 vg.name = daz_map[vg_name]
             elif vg_name_lower in daz_map_lower:
                 vg.name = daz_map_lower[vg_name_lower]
-            elif vg_name_lower in all_armature_bone_names_lower:
-                vg.name = all_armature_bone_names_lower[vg_name_lower]
 
             # 2. Verify if updated name matches an active bone on armature
             if vg.name not in all_armature_bone_names:
@@ -627,6 +733,34 @@ def purge_zero_weight_assignments(mesh_obj, threshold=0.0001):
                     vgroup.remove([v.index])
                 except Exception:
                     pass
+
+
+def smooth_vertex_group(mesh_obj, group_name, factor=0.6, repeat=12):
+    """
+    Applies Blender's native topology-aware Laplacian smoothing to a specific vertex group.
+    Diffuses weights smoothly along mesh edges for organic gradients.
+    """
+    if not mesh_obj or mesh_obj.type != 'MESH':
+        return
+    vg = mesh_obj.vertex_groups.get(group_name)
+    if not vg:
+        return
+
+    with ArmatureModeGuard(mesh_obj, 'OBJECT'):
+        try:
+            bpy.ops.object.select_all(action='DESELECT')
+            mesh_obj.select_set(True)
+            bpy.context.view_layer.objects.active = mesh_obj
+            mesh_obj.vertex_groups.active_index = vg.index
+            
+            bpy.ops.object.vertex_group_smooth(
+                group_select_mode='ACTIVE',
+                factor=factor,
+                repeat=repeat,
+                expand=0.0
+            )
+        except Exception as e:
+            print(f"[MasterSK] Notice during vertex group smooth on '{group_name}': {e}")
 
 
 def inject_ue5_als_ik_bones(armature_obj):
@@ -1017,7 +1151,7 @@ def prune_body_rig_bones(body_armature_obj):
     Prunes SKM_Body_Rig by deleting ALL facial expression bones parented under 'head',
     preserving neck_01 -> neck_02 -> head.
     """
-    protected_body_bones = {"neck_01", "neck_02", "neck01", "neck02", "head", "spine_04", "pelvis", "root"}
+    protected_body_bones = {"neck_01", "neck_02", "neck01", "neck02", "head", "spine_04", "pelvis", "root", "glute_l", "glute_r"}
 
     with ArmatureModeGuard(body_armature_obj, 'EDIT'):
         edit_bones = body_armature_obj.data.edit_bones
@@ -1307,3 +1441,315 @@ def optimize_head_mesh_shape_keys(head_mesh_obj):
 # Function aliases for operators.py compatibility
 purge_body_shape_keys = purge_body_mesh_shape_keys
 optimize_head_shape_keys = optimize_head_mesh_shape_keys
+
+
+# --- GENDER VARIANT SETUP ROUTINES (MALE & FEMALE) ---
+
+def setup_male_variant_rig_and_mesh(armature_obj, mesh_objs):
+    """
+    Male Variant Configuration:
+    1. Removes pectoral bones (pectoral_l, pectoral_r and DAZ aliases) and glute bones (glute_l, glute_r).
+    2. Purges pectoral and glute vertex groups from the character mesh and normalizes weights across torso.
+    """
+    if not armature_obj or armature_obj.type != 'ARMATURE':
+        return False, "Invalid Armature target."
+
+    pectoral_and_glute_names = {
+        "pectoral_l", "pectoral_r", "lPectoral", "rPectoral",
+        "l_pectoral", "r_pectoral", "l_pectoral(drv)", "r_pectoral(drv)",
+        "g9_l_pectoral", "g9_r_pectoral",
+        "glute_l", "glute_r", "l_glute", "r_glute"
+    }
+
+    # 1. Delete Pectoral & Glute bones in EDIT mode
+    removed_bones_count = 0
+    with ArmatureModeGuard(armature_obj, 'EDIT'):
+        edit_bones = armature_obj.data.edit_bones
+        for eb in list(edit_bones):
+            eb_name = eb.name
+            eb_name_lower = eb_name.lower()
+            if eb_name in pectoral_and_glute_names or eb_name_lower in [p.lower() for p in pectoral_and_glute_names]:
+                edit_bones.remove(eb)
+                removed_bones_count += 1
+
+    # 2. Purge Pectoral & Glute Vertex Groups on mesh objects
+    removed_vgroups_count = 0
+    for mesh_obj in mesh_objs:
+        if not mesh_obj or mesh_obj.type != 'MESH':
+            continue
+
+        vgroups = mesh_obj.vertex_groups
+        for vg in list(vgroups):
+            vg_name = vg.name
+            vg_name_lower = vg_name.lower()
+            if vg_name in pectoral_and_glute_names or vg_name_lower in [p.lower() for p in pectoral_and_glute_names]:
+                try:
+                    vgroups.remove(vg)
+                    removed_vgroups_count += 1
+                except Exception as e:
+                    print(f"[MasterSK Male Setup] Error removing vertex group '{vg.name}': {e}")
+
+        # Normalize remaining vertex weights
+        with ArmatureModeGuard(mesh_obj, 'OBJECT'):
+            try:
+                bpy.ops.object.select_all(action='DESELECT')
+                mesh_obj.select_set(True)
+                bpy.context.view_layer.objects.active = mesh_obj
+                bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+            except Exception as e:
+                print(f"[MasterSK Male Setup] Vertex group normalize notice: {e}")
+
+    return True, f"Male variant configured: Pectoral & Glute bones ({removed_bones_count}) & vertex groups ({removed_vgroups_count}) removed."
+
+
+def setup_female_variant_rig_and_mesh(armature_obj, mesh_objs):
+    """
+    Female Variant Configuration:
+    1. Retains or recreates pectoral_l and pectoral_r.
+    2. Injects glute_l and glute_r bones parented to pelvis:
+       - Placed over the left/right buttock cheeks with scale-proportional length.
+       - Angled backward (-Y) and downward (-Z) following natural buttock contour.
+    3. Generates smooth, anatomically constrained glute weight paint (posterior only, smooth cosine falloff).
+    """
+    if not armature_obj or armature_obj.type != 'ARMATURE':
+        return False, "Invalid Armature target."
+
+    glute_l_head_local = None
+    glute_r_head_local = None
+    glute_l_tail_local = None
+    glute_r_tail_local = None
+    bwd_dir = mathutils.Vector((0.0, 1.0, 0.0))
+    glute_length = 0.15
+
+    # 1. Edit Mode: Find pelvis, thighs, pectorals, calculate placement & scale-invariant vectors
+    with ArmatureModeGuard(armature_obj, 'EDIT'):
+        edit_bones = armature_obj.data.edit_bones
+
+        pelvis_eb = _find_edit_bone(edit_bones, "pelvis", "hip", "Hip", "g9_pelvis", "g9_hip")
+        if not pelvis_eb:
+            return False, "Could not find 'pelvis' or 'hip' bone in armature."
+
+        thigh_l_eb = _find_edit_bone(edit_bones, "thigh_l", "l_thigh", "lThigh", "g9_l_thigh")
+        thigh_r_eb = _find_edit_bone(edit_bones, "thigh_r", "r_thigh", "rThigh", "g9_r_thigh")
+
+        if not thigh_l_eb or not thigh_r_eb:
+            return False, "Could not find thigh bones ('thigh_l'/'l_thigh' and 'thigh_r'/'r_thigh') in armature."
+
+        # Ensure pectoral_l and pectoral_r exist (recreate if deleted by prior male setup)
+        spine_03_eb = (
+            _find_edit_bone(edit_bones, "spine_03", "spine03", "spine3", "g9_spine3")
+            or _find_edit_bone(edit_bones, "spine_04", "spine04", "spine4")
+        )
+        if spine_03_eb:
+            pec_l = _find_edit_bone(edit_bones, "pectoral_l", "l_pectoral", "lPectoral")
+            if not pec_l:
+                pec_l = edit_bones.new("pectoral_l")
+                pec_l.parent = spine_03_eb
+                pec_l.use_connect = False
+                h_x = abs(thigh_l_eb.head.x) * 0.45
+                pec_l.head = mathutils.Vector((h_x, spine_03_eb.head.y - 0.05, spine_03_eb.head.z + 0.05))
+                pec_l.tail = mathutils.Vector((h_x * 1.2, spine_03_eb.head.y - 0.18, spine_03_eb.head.z + 0.02))
+                pec_l.use_deform = True
+                pec_l.roll = 0.0
+
+            pec_r = _find_edit_bone(edit_bones, "pectoral_r", "r_pectoral", "rPectoral")
+            if not pec_r:
+                pec_r = edit_bones.new("pectoral_r")
+                pec_r.parent = spine_03_eb
+                pec_r.use_connect = False
+                h_x = -abs(thigh_r_eb.head.x) * 0.45
+                pec_r.head = mathutils.Vector((h_x, spine_03_eb.head.y - 0.05, spine_03_eb.head.z + 0.05))
+                pec_r.tail = mathutils.Vector((h_x * 1.2, spine_03_eb.head.y - 0.18, spine_03_eb.head.z + 0.02))
+                pec_r.use_deform = True
+                pec_r.roll = 0.0
+
+        # Calculate scale-invariant bone length derived from hip width
+        hip_width = (thigh_l_eb.head - thigh_r_eb.head).length
+        if hip_width < 0.001:
+            hip_width = 0.30
+        glute_length = max(hip_width * 0.42, 0.10)
+
+        # Build clean character-relative local coordinate axes
+        # lateral_vec: Points from Right Hip to Left Hip (+X side)
+        lateral_vec = (thigh_l_eb.head - thigh_r_eb.head).normalized()
+        if lateral_vec.length < 0.001:
+            lateral_vec = mathutils.Vector((1.0, 0.0, 0.0))
+
+        # up_vec: Points from Pelvis Head up toward Pelvis Tail (+Z side)
+        up_vec = (pelvis_eb.tail - pelvis_eb.head).normalized()
+        if up_vec.length < 0.001:
+            up_vec = mathutils.Vector((0.0, 0.0, 1.0))
+
+        # fwd_vec: Perpendicular forward direction facing the chest
+        fwd_vec = up_vec.cross(lateral_vec).normalized()
+        if fwd_vec.length < 0.001:
+            fwd_vec = mathutils.Vector((0.0, -1.0, 0.0))
+
+        # Ensure fwd_vec points in the direction of the chest (opposite of backward)
+        pectoral_eb = _find_edit_bone(edit_bones, "pectoral_l", "l_pectoral", "lPectoral", "pectoral_r", "r_pectoral")
+        if pectoral_eb and (pectoral_eb.tail - pectoral_eb.head).length > 0.001:
+            pec_vec = (pectoral_eb.tail - pectoral_eb.head).normalized()
+            if fwd_vec.dot(pec_vec) < 0:
+                fwd_vec = -fwd_vec
+        elif fwd_vec.y > 0 and abs(fwd_vec.y) > abs(fwd_vec.x):
+            # In DAZ G9 standard, chest faces -Y
+            fwd_vec = -fwd_vec
+
+        bwd_vec = -fwd_vec
+        bwd_dir = bwd_vec
+
+        # Downward vector: explicitly point downward in Z (-15° pitch)
+        down_vec = mathutils.Vector((0.0, 0.0, -1.0))
+
+        # Direction vectors: blend backward (bwd_vec * 0.85), downward (down_vec * 0.228), and outward (lateral_vec * 0.20)
+        # Note: 0.228 / 0.85 = tan(15°), corresponding to -15° pitch downward
+        dir_l = (bwd_vec * 0.85 + down_vec * 0.228 + lateral_vec * 0.20).normalized()
+        dir_r = (bwd_vec * 0.85 + down_vec * 0.228 - lateral_vec * 0.20).normalized()
+
+        # Glute head placement (centered over buttock cheek at upper hip joint height, offset 2 cm down)
+        g_z_offset = mathutils.Vector((0.0, 0.0, glute_length * 0.20 - 0.02))
+        g_y_offset = bwd_vec * (glute_length * 0.20)
+
+        # Left Glute Head (Shifted slightly inward toward midline)
+        glute_l_head_local = thigh_l_eb.head - (lateral_vec * (glute_length * 0.15)) + g_y_offset + g_z_offset
+        glute_l_tail_local = glute_l_head_local + (dir_l * glute_length)
+
+        # Right Glute Head (Shifted slightly inward toward midline)
+        glute_r_head_local = thigh_r_eb.head + (lateral_vec * (glute_length * 0.15)) + g_y_offset + g_z_offset
+        glute_r_tail_local = glute_r_head_local + (dir_r * glute_length)
+
+        # Create or update glute_l edit bone
+        glute_l_eb = edit_bones.get("glute_l") or edit_bones.new("glute_l")
+        glute_l_eb.use_connect = False
+        glute_l_eb.parent = pelvis_eb
+        glute_l_eb.head = glute_l_head_local
+        glute_l_eb.tail = glute_l_tail_local
+        glute_l_eb.roll = 0.0
+        glute_l_eb.use_deform = True
+
+        # Create or update glute_r edit bone
+        glute_r_eb = edit_bones.get("glute_r") or edit_bones.new("glute_r")
+        glute_r_eb.use_connect = False
+        glute_r_eb.parent = pelvis_eb
+        glute_r_eb.head = glute_r_head_local
+        glute_r_eb.tail = glute_r_tail_local
+        glute_r_eb.roll = 0.0
+        glute_r_eb.use_deform = True
+
+    # Reset pose basis transform on glute pose bones
+    for bone_name in ("glute_l", "glute_r"):
+        pb = armature_obj.pose.bones.get(bone_name)
+        if pb:
+            pb.matrix_basis = mathutils.Matrix.Identity(4)
+            pb.rotation_euler = (0.0, 0.0, 0.0)
+            pb.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
+            pb.location = (0.0, 0.0, 0.0)
+            pb.scale = (1.0, 1.0, 1.0)
+
+    # 2. Object Mode: Calculate World Space segment endpoints & generate smooth weight paint
+    glute_l_head_w = armature_obj.matrix_world @ glute_l_head_local
+    glute_l_tail_w = armature_obj.matrix_world @ glute_l_tail_local
+    glute_r_head_w = armature_obj.matrix_world @ glute_r_head_local
+    glute_r_tail_w = armature_obj.matrix_world @ glute_r_tail_local
+
+    bwd_dir_w = (armature_obj.matrix_world.to_3x3() @ bwd_dir).normalized()
+    pelvis_mid_w = armature_obj.matrix_world @ (pelvis_eb.head + (pelvis_eb.tail - pelvis_eb.head) * 0.5)
+
+    glute_len_w = (glute_l_tail_w - glute_l_head_w).length
+    radius_world = max(glute_len_w * 1.80, 0.28)
+
+    total_assigned_verts = 0
+
+    for mesh_obj in mesh_objs:
+        if not mesh_obj or mesh_obj.type != 'MESH':
+            continue
+
+        vgroups = mesh_obj.vertex_groups
+
+        # Clear existing glute groups to reassign cleanly
+        for gname in ("glute_l", "glute_r"):
+            old_g = vgroups.get(gname)
+            if old_g:
+                vgroups.remove(old_g)
+
+        glute_l_vg = vgroups.new(name="glute_l")
+        glute_r_vg = vgroups.new(name="glute_r")
+
+        glute_l_weights = {}
+        glute_r_weights = {}
+
+        mesh_data = mesh_obj.data
+        for v in mesh_data.vertices:
+            v_w = mesh_obj.matrix_world @ v.co
+
+            # Posterior Check: Must be on the rear side of pelvis midpoint
+            vec_from_pelvis = v_w - pelvis_mid_w
+            dot_bwd = vec_from_pelvis.dot(bwd_dir_w)
+            if dot_bwd < -0.05:
+                continue
+
+            # Left Glute (Left side of posterior body)
+            if v_w.x >= (pelvis_mid_w.x - 0.04):
+                dist_l = _distance_to_segment(v_w, glute_l_head_w, glute_l_tail_w)
+                if dist_l < radius_world:
+                    u = dist_l / radius_world
+                    # Smooth quadratic falloff curve (0.85 max strength near bone)
+                    w_val = 0.85 * ((1.0 - u) ** 1.8)
+                    if w_val > 0.005:
+                        glute_l_weights[v.index] = w_val
+
+            # Right Glute (Right side of posterior body)
+            if v_w.x <= (pelvis_mid_w.x + 0.04):
+                dist_r = _distance_to_segment(v_w, glute_r_head_w, glute_r_tail_w)
+                if dist_r < radius_world:
+                    u = dist_r / radius_world
+                    # Smooth quadratic falloff curve (0.85 max strength near bone)
+                    w_val = 0.85 * ((1.0 - u) ** 1.8)
+                    if w_val > 0.005:
+                        glute_r_weights[v.index] = w_val
+
+        # Apply Left Glute Weights using proportional weight transfer (Pectoral style)
+        for v_idx, g_w in glute_l_weights.items():
+            vert = mesh_data.vertices[v_idx]
+            tot_w = sum(g.weight for g in vert.groups)
+            if tot_w > 0:
+                glute_target_w = min(g_w, 0.85 * tot_w)
+                scale_f = (tot_w - glute_target_w) / tot_w
+                for g in vert.groups:
+                    vg_target = vgroups[g.group]
+                    vg_target.add([v_idx], g.weight * scale_f, 'REPLACE')
+                glute_l_vg.add([v_idx], glute_target_w, 'REPLACE')
+            else:
+                glute_l_vg.add([v_idx], g_w, 'REPLACE')
+            total_assigned_verts += 1
+
+        # Apply Right Glute Weights using proportional weight transfer (Pectoral style)
+        for v_idx, g_w in glute_r_weights.items():
+            vert = mesh_data.vertices[v_idx]
+            tot_w = sum(g.weight for g in vert.groups)
+            if tot_w > 0:
+                glute_target_w = min(g_w, 0.85 * tot_w)
+                scale_f = (tot_w - glute_target_w) / tot_w
+                for g in vert.groups:
+                    vg_target = vgroups[g.group]
+                    vg_target.add([v_idx], g.weight * scale_f, 'REPLACE')
+                glute_r_vg.add([v_idx], glute_target_w, 'REPLACE')
+            else:
+                glute_r_vg.add([v_idx], g_w, 'REPLACE')
+            total_assigned_verts += 1
+
+        # Purge 0-weight assignments
+        purge_zero_weight_assignments(mesh_obj)
+
+        # Apply Blender's native topology-aware Laplacian Smooth Pass (12 iterations, 0.6 factor)
+        smooth_vertex_group(mesh_obj, "glute_l", factor=0.6, repeat=12)
+        smooth_vertex_group(mesh_obj, "glute_r", factor=0.6, repeat=12)
+
+    return True, f"Female variant configured: Glute bones injected (length: {glute_length:.2f}m) & smooth weights assigned to {total_assigned_verts} vertices."
+
+
+
+
+
+
+

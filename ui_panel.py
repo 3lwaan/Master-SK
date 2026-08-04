@@ -68,6 +68,18 @@ class MSK_PT_main_panel(bpy.types.Panel):
 
         layout.separator()
 
+        # GENDER VARIANT SETUP BOX
+        gender_box = layout.box()
+        g_header = gender_box.row(align=True)
+        g_header.label(text="Gender Variant Setup", icon='USER')
+
+        gb_col = gender_box.column(align=True)
+        gb_col.scale_y = 1.1
+        gb_col.operator("master_sk.setup_male", text="Set Up Male Variant", icon='USER')
+        gb_col.operator("master_sk.setup_female", text="Set Up Female Variant", icon='USER')
+
+        layout.separator()
+
         # STEP 2 BOX
         step2_box = layout.box()
         s2_row = step2_box.row(align=True)

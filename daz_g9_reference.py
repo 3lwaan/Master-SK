@@ -197,6 +197,12 @@ DAZ_TO_MASTER_MAP = {
     "r_thightwist1": "thigh_twist_01_r",
     "r_tightwist2": "thigh_twist_02_r",
     "r_thightwist2": "thigh_twist_02_r",
+
+    # Glutes
+    "glute_l": "glute_l",
+    "glute_r": "glute_r",
+    "l_glute": "glute_l",
+    "r_glute": "glute_r",
 }
 
 MASTER_SK_HIERARCHY = {
@@ -209,7 +215,9 @@ MASTER_SK_HIERARCHY = {
     "spine_03": "spine_02",
     "spine_04": "spine_03",
     
-    # Legs
+    # Legs & Glutes
+    "glute_l": "pelvis",
+    "glute_r": "pelvis",
     "thigh_l": "pelvis",
     "thigh_twist_01_l": "thigh_l",
     "thigh_twist_02_l": "thigh_twist_01_l",
