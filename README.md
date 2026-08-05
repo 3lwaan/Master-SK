@@ -1,4 +1,4 @@
-# 🚀 Master SK - Automated DAZ Genesis 9 to UE5 / ALS Pipeline for Blender
+#  Master SK - Automated DAZ Genesis 9 to UE5 / ALS Pipeline for Blender
 
 <div align="center">
 
@@ -13,7 +13,7 @@
 
 </div>
 
-## 💡 Why Master SK?
+##  Why Master SK?
 
 Importing **DAZ Genesis 9** characters into **Unreal Engine 5** or **Advanced Locomotion System (ALS)** manually is notoriously frustrating and time-consuming:
 
@@ -31,18 +31,24 @@ Importing **DAZ Genesis 9** characters into **Unreal Engine 5** or **Advanced Lo
 
 | Feature | Description |
 | :--- | :--- |
-| 🦴 **UE5 & ALS Hierarchy Sync** | Automates bone renaming (`hip` -> `pelvis`), hierarchy restructuring, driver target updates, and clears pelvic constraints for full ALS translation. |
-| 💃 **Anatomical Gender Variants** | Injects scale-proportional `glute_l` / `glute_r` and `pectoral_l` / `pectoral_r` secondary deformers with topology-aware Laplacian weight paint. |
-| 🎯 **Automated IK Bone Injection** | Injects 6 essential UE5 IK bones (`ik_foot_root`, `ik_foot_l`, `ik_foot_r`, `ik_hand_root`, `ik_hand_gun`, `ik_hand_l`, `ik_hand_r`). |
-| 👤 **Modular Head & Body Split** | Splits meshes into `SKM_Head_Mesh` and `SKM_Body_Mesh`, generates decoupled armatures (`SKM_Face_Rig` & `SKM_Body_Rig`), and purges unused body morphs (~90% file size reduction). |
-| 🎨 **Material Slot Consolidation** | Merges duplicate materials (Teeth -> Mouth, Nails -> Body, EyeMoisture -> Eyes) to optimize draw calls for game engine export. |
+| **UE5 & ALS Hierarchy Sync** | Automates bone renaming (`hip` -> `pelvis`), hierarchy restructuring, driver target updates, and clears pelvic constraints for full ALS translation. |
+| **Anatomical Gender Variants** | Injects scale-proportional `glute_l` / `glute_r` and `pectoral_l` / `pectoral_r` secondary deformers with topology-aware Laplacian weight paint. |
+| **Automated IK Bone Injection** | Injects 6 essential UE5 IK bones (`ik_foot_root`, `ik_foot_l`, `ik_foot_r`, `ik_hand_root`, `ik_hand_gun`, `ik_hand_l`, `ik_hand_r`). |
+| **Modular Head & Body Split** | Splits meshes into `SKM_Head_Mesh` and `SKM_Body_Mesh`, generates decoupled armatures (`SKM_Face_Rig` & `SKM_Body_Rig`), and purges unused body morphs (~90% file size reduction). |
+| **Material Slot Consolidation** | Merges duplicate materials (Teeth -> Mouth, Nails -> Body, EyeMoisture -> Eyes) to optimize draw calls for game engine export. |
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Building
 
-1. Download the compiled **`master_sk_tools.zip`** package.
-2. In Blender, navigate to **`Edit > Preferences > Add-ons`**.
+### 🛠️ Building from Source (GitHub)
+If you cloned this repository from GitHub:
+1. Double-click **`build_addon.bat`** (or run `.\build_addon.bat` in Terminal).
+2. The script automatically packages all necessary source files into **`master_sk_tools.zip`**.
+
+### 🔌 Installing in Blender
+1. Open Blender 4.4+.
+2. Navigate to **`Edit > Preferences > Add-ons`**.
 3. Click the top-right **`Install...`** button and select `master_sk_tools.zip`.
 4. Enable **`Master SK`** in the addon list.
 5. Open the 3D Viewport sidebar (`N` key) and find the **`Master SK`** tab.
@@ -57,7 +63,7 @@ Importing **DAZ Genesis 9** characters into **Unreal Engine 5** or **Advanced Lo
  [5. Join Facial Meshes] <── [4. Modular Head/Body Split] <── [3. Inject IK Bones]
 ```
 
-### 1️⃣ Step 1: Prepare Character
+###  Step 1️⃣: Prepare Character
 - Select your imported DAZ Genesis 9 character armature and mesh.
 - Click **`1. Prepare Active Character`**.
 - *What it does*: Validates selection, applies location/rotation/scale transforms to 1.0, and initializes object references.
@@ -70,15 +76,15 @@ Importing **DAZ Genesis 9** characters into **Unreal Engine 5** or **Advanced Lo
   - Sets exact -15° downward pitch and symmetrical left/right mirror alignment.
   - Applies Laplacian topology-aware weight painting for smooth, natural deformation.
 
-### 2️⃣ Step 2: Rig & Weight Sync
+###  Step 2️⃣: Rig & Weight Sync
 - Click **`2. Process Rig & Vertex Groups`**.
 - *What it does*: Renames armature object and datablock to `root`, clears pelvic constraints, maps DAZ bones to `MASTER_SK_HIERARCHY`, merges toe/metacarpal weights, and updates driver subtarget references.
 
-### 3️⃣ Step 3: Inject IK Bones
+###  Step 3️⃣: Inject IK Bones
 - Click **`3. Inject IK Bones`**.
 - *What it does*: Injects all 6 UE5/ALS IK bones (`ik_foot_root`, `ik_foot_l/r`, `ik_hand_root`, `ik_hand_gun`, `ik_hand_l/r`) with accurate bone tail lengths and parent relationships.
 
-### 4️⃣ Step 4: Modular Head & Body Split
+###  Step 4️⃣: Modular Head & Body Split
 - Click **`4. Separate Head & Modularize`**.
 - *What it does*:
   - Consolidates materials (Mouth Cavity -> Head, Nails -> Body).
@@ -86,7 +92,7 @@ Importing **DAZ Genesis 9** characters into **Unreal Engine 5** or **Advanced Lo
   - Creates unique single-user datablock copies of `SKM_Body_Rig` and `SKM_Face_Rig`.
   - Prunes unused body shape keys (reducing FBX export size by ~90%) while retaining ARKit/Viseme facial morphs on the head.
 
-### 5️⃣ Step 5: Join Facial Meshes & Materials
+###  Step 5️⃣: Join Facial Meshes & Materials
 - Click **`5. Join Facial Meshes & Materials`**.
 - *What it does*: Standardizes UV map names (`UVMap`), joins eyes/eyelashes/mouth to the head mesh, consolidates material slots (Teeth -> Mouth, EyeMoisture -> Eyes), and performs a final audit.
 
