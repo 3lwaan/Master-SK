@@ -542,6 +542,10 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                             parent_eb = edit_bones.get("neck01")
                         elif parent_target == "spine_04":
                             parent_eb = edit_bones.get("spine_03")
+                        elif parent_target == "metatarsal_l":
+                            parent_eb = edit_bones.get("foot_l")
+                        elif parent_target == "metatarsal_r":
+                            parent_eb = edit_bones.get("foot_r")
 
                     if parent_eb and parent_eb != child_eb:
                         child_eb.parent = parent_eb
