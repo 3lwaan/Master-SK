@@ -13,6 +13,7 @@ from .rig_utils import (
     merge_hip_weights_to_pelvis,
     merge_child_toe_weights_to_toes,
     merge_metacarpal_weights_to_hands,
+    merge_metatarsal_weights_to_feet,
     purge_bones_and_restructure_hierarchy,
     update_all_drivers_and_constraints,
     sync_bone_and_vertex_group_names,
@@ -111,20 +112,23 @@ class MSK_OT_process_rig_vertex_groups(bpy.types.Operator):
             # 7. Merge 8 metacarpal weights into 'hand_l' and 'hand_r'
             meta_verts, meta_vgs = merge_metacarpal_weights_to_hands(mesh_objs)
 
-            # 8. Bone Purge (including 20 child toe bones & 8 metacarpal bones) & Hierarchy Restructuring
+            # 8. Merge metatarsal weights into 'foot_l' and 'foot_r'
+            meta_tars_verts, meta_tars_vgs = merge_metatarsal_weights_to_feet(mesh_objs)
+
+            # 9. Bone Purge (including child toe bones, metacarpal & metatarsal bones) & Hierarchy Restructuring
             deleted_count = purge_bones_and_restructure_hierarchy(armature_obj, ref_data)
 
-            # 9. Synchronized Vertex Group Renaming & Cleanup
+            # 10. Synchronized Vertex Group Renaming & Cleanup
             sync_bone_and_vertex_group_names(armature_obj, mesh_objs, ref_data)
 
-            # 10. Update subtarget bone names across all drivers & constraints (e.g. l_eye -> eye_l)
+            # 11. Update subtarget bone names across all drivers & constraints (e.g. l_eye -> eye_l)
             update_all_drivers_and_constraints(ref_data)
 
             props.step2_completed = True
-            msg = f"Step 2 Complete: Restructured '{armature_obj.name}', purged {deleted_count} bones & transferred metacarpal/toe weights."
+            msg = f"Step 2 Complete: Restructured '{armature_obj.name}', purged {deleted_count} bones & transferred metacarpal/metatarsal/toe weights."
             props.status_message = msg
             
-            add_audit_log_entry(context, "Step 2", f"Purged {deleted_count} bones; transferred {meta_verts} metacarpal vertex weights to hand_l/r.", "SUCCESS", "CHECKMARK")
+            add_audit_log_entry(context, "Step 2", f"Purged {deleted_count} bones; transferred metacarpal/metatarsal weights to hands/feet.", "SUCCESS", "CHECKMARK")
             self.report({'INFO'}, msg)
             return {'FINISHED'}
 

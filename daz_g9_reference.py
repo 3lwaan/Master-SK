@@ -399,4 +399,7 @@ BONES_TO_DELETE = [
     "bigtoe_01_r", "bigtoe_02_r", "indextoe_01_r", "indextoe_02_r",
     "midtoe_01_r", "midtoe_02_r", "ringtoe_01_r", "ringtoe_02_r",
     "pinkytoe_01_r", "pinkytoe_02_r", "pinkeytoe_02_r",
+    # Metatarsal Bones (Left & Right)
+    "l_metatarsal", "r_metatarsal", "lmetatarsal", "rmetatarsal",
+    "lMetatarsal", "rMetatarsal", "metatarsal_l", "metatarsal_r",
 ]

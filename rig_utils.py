@@ -319,6 +319,12 @@ def is_metacarpal_bone(b_name):
     return "metacarpal" in name_lower
 
 
+def is_metatarsal_bone(b_name):
+    """Returns True for any foot metatarsal bone."""
+    name_lower = b_name.lower()
+    return "metatarsal" in name_lower
+
+
 def merge_child_toe_weights_to_toes(mesh_objs):
     """
     Merges all 20 child toe vertex weights into 'toes_l' and 'toes_r' before deleting child toe bones,
@@ -476,10 +482,92 @@ def merge_metacarpal_weights_to_hands(mesh_objs):
     return transferred_verts, purged_vgs_count
 
 
+def merge_metatarsal_weights_to_feet(mesh_objs):
+    """
+    Transfers vertex weights from metatarsal vertex groups into 'foot_l' and 'foot_r'
+    before deleting metatarsal bones in Step 2.
+    Returns (transferred_vertex_count, purged_group_count)
+    """
+    transferred_verts = 0
+    purged_vgs_count = 0
+
+    for mesh_obj in mesh_objs:
+        if not mesh_obj or mesh_obj.type != 'MESH':
+            continue
+
+        vgroups = mesh_obj.vertex_groups
+        
+        foot_l_vg = vgroups.get("foot_l") or vgroups.get("l_foot")
+        if foot_l_vg and foot_l_vg.name != "foot_l":
+            foot_l_vg.name = "foot_l"
+        elif not foot_l_vg:
+            foot_l_vg = vgroups.new(name="foot_l")
+
+        foot_r_vg = vgroups.get("foot_r") or vgroups.get("r_foot")
+        if foot_r_vg and foot_r_vg.name != "foot_r":
+            foot_r_vg.name = "foot_r"
+        elif not foot_r_vg:
+            foot_r_vg = vgroups.new(name="foot_r")
+
+        left_meta_vgs = []
+        right_meta_vgs = []
+
+        for vg in list(vgroups):
+            name_lower = vg.name.lower()
+            if is_metatarsal_bone(vg.name):
+                if name_lower.endswith("_l") or name_lower.startswith("l_") or "left" in name_lower:
+                    left_meta_vgs.append(vg)
+                elif name_lower.endswith("_r") or name_lower.startswith("r_") or "right" in name_lower:
+                    right_meta_vgs.append(vg)
+
+        left_indices = {vg.index for vg in left_meta_vgs}
+        right_indices = {vg.index for vg in right_meta_vgs}
+
+        if not left_indices and not right_indices:
+            continue
+
+        mesh_data = mesh_obj.data
+        for v in mesh_data.vertices:
+            left_sum = 0.0
+            right_sum = 0.0
+            existing_l = 0.0
+            existing_r = 0.0
+
+            for g in v.groups:
+                if g.group == foot_l_vg.index:
+                    existing_l = g.weight
+                elif g.group == foot_r_vg.index:
+                    existing_r = g.weight
+
+                if g.group in left_indices:
+                    left_sum += g.weight
+                elif g.group in right_indices:
+                    right_sum += g.weight
+
+            if left_sum > 0.0:
+                new_w = min(1.0, existing_l + left_sum)
+                foot_l_vg.add([v.index], new_w, 'REPLACE')
+                transferred_verts += 1
+
+            if right_sum > 0.0:
+                new_w = min(1.0, existing_r + right_sum)
+                foot_r_vg.add([v.index], new_w, 'REPLACE')
+                transferred_verts += 1
+
+        for vg in left_meta_vgs + right_meta_vgs:
+            try:
+                vgroups.remove(vg)
+                purged_vgs_count += 1
+            except Exception as e:
+                print(f"[MasterSK] Could not remove metatarsal vertex group '{vg.name}': {e}")
+
+    return transferred_verts, purged_vgs_count
+
+
 def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
     """
     Step 2 Rig Processing (Edit Mode):
-    - Deletes 'root', 'hip', anchor bones, 20 child toe bones, 8 metacarpal bones, and driven bones (*(drv)*).
+    - Deletes 'root', 'hip', anchor bones, 20 child toe bones, 8 metacarpal bones, metatarsal bones, and driven bones (*(drv)*).
     - Preserves eyelid bones and parents them to eye_l / eye_r so they follow eye rotation smoothly.
     - Top-level deformation bone is 'pelvis' (parent is None).
     """
@@ -509,6 +597,7 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
                 _strip_bone_prefix(b_name) in explicit_delete_normalized or
                 is_child_toe_bone(b_name) or
                 is_metacarpal_bone(b_name) or
+                is_metatarsal_bone(b_name) or
                 "(drv)" in b_name_lower or
                 fnmatch.fnmatch(b_name_lower, "*(drv)*")
             )
@@ -529,6 +618,30 @@ def purge_bones_and_restructure_hierarchy(armature_obj, reference_data):
         pelvis_eb = edit_bones.get("pelvis")
         if pelvis_eb:
             pelvis_eb.parent = None
+
+            # Disconnect child bone heads so modifying pelvis bone does not drag child heads
+            for child_eb in pelvis_eb.children:
+                child_eb.use_connect = False
+
+            # Calculate hip center from thigh_l and thigh_r heads
+            thigh_l_eb = edit_bones.get("thigh_l")
+            thigh_r_eb = edit_bones.get("thigh_r")
+            spine_01_eb = edit_bones.get("spine_01")
+
+            if thigh_l_eb and thigh_r_eb:
+                hip_center = (thigh_l_eb.head + thigh_r_eb.head) * 0.5
+            elif spine_01_eb:
+                hip_center = spine_01_eb.head.copy()
+            else:
+                hip_center = pelvis_eb.head.copy()
+
+            # Target length: scale to x0.5 (half size)
+            target_length = max(pelvis_eb.length * 0.5, 0.08)
+
+            # Position Pelvis head -10.5 cm (-0.105 m) below hip center, pointing UPWARD (+Z) rotated 180° in X
+            pelvis_eb.head = mathutils.Vector((hip_center.x, hip_center.y, hip_center.z - 0.105))
+            pelvis_eb.tail = pelvis_eb.head + mathutils.Vector((0.0, 0.0, target_length))
+            pelvis_eb.roll = 0.0
 
         for child_target, parent_target in hierarchy.items():
             child_eb = edit_bones.get(child_target)
@@ -687,6 +800,7 @@ def sync_bone_and_vertex_group_names(armature_obj, mesh_objs, reference_data):
                 vg_name_lower in ["root", "hip", "l_hand_anchor", "r_hand_anchor", "l_foot_anchor", "r_foot_anchor"] or
                 is_child_toe_bone(vg_name) or
                 is_metacarpal_bone(vg_name) or
+                is_metatarsal_bone(vg_name) or
                 "(drv)" in vg_name_lower or
                 fnmatch.fnmatch(vg_name_lower, "*(drv)*")
             )
