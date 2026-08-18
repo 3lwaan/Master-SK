@@ -984,17 +984,100 @@ def inject_ue5_als_ik_bones(armature_obj):
 
 # --- STEP 4 & STEP 5 MATERIAL & SPLIT ROUTINES ---
 
+def load_nails_uv_reference_data():
+    """
+    Loads hardcoded Fingernails & Toenails UV coordinate mapping from g9_nails_uv_reference.json.
+    """
+    from pathlib import Path
+    import json
+
+    addon_dir = Path(__file__).parent.resolve()
+    json_path = addon_dir / "g9_nails_uv_reference.json"
+
+    if not json_path.exists():
+        print(f"[MasterSK] Nails UV reference file '{json_path}' not found.")
+        return None
+
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data
+    except Exception as e:
+        print(f"[MasterSK] Error loading nails UV reference JSON: {e}")
+        return None
+
+
+def apply_hardcoded_nails_uv_layout(mesh_obj):
+    """
+    Applies hardcoded Fingernails and Toenails UV coordinates into the active UV map (e.g. 'Base Multi UDIM' or 'UVMap').
+    Positions nail UV islands neatly into the central channel of UDIM Tile 1004 (Arms map).
+    Returns (num_transformed_polys, log_msg)
+    """
+    if not mesh_obj or mesh_obj.type != 'MESH':
+        return 0, "Invalid mesh object for nail UV transform."
+
+    ref_data = load_nails_uv_reference_data()
+    if not ref_data or "categories" not in ref_data:
+        return 0, "Nail UV reference data not available."
+
+    mesh_data = mesh_obj.data
+    uv_layers = mesh_data.uv_layers
+    if not uv_layers:
+        return 0, "No UV layers found on mesh object."
+
+    # Resolve active UV layer or primary UDIM layer
+    uv_layer = uv_layers.get("Base Multi UDIM") or uv_layers.get("UVMap") or uv_layers.active or uv_layers[0]
+    uv_data = uv_layer.data
+
+    transformed_poly_count = 0
+    categories = ref_data.get("categories", {})
+
+    with ArmatureModeGuard(mesh_obj, 'OBJECT'):
+        for cat_name, cat_info in categories.items():
+            poly_uv_map = cat_info.get("poly_uv_coordinates", {})
+            for poly_idx_str, loop_uv_coords in poly_uv_map.items():
+                try:
+                    poly_idx = int(poly_idx_str)
+                except ValueError:
+                    continue
+
+                if poly_idx >= len(mesh_data.polygons):
+                    continue
+
+                poly = mesh_data.polygons[poly_idx]
+                loop_indices = poly.loop_indices
+
+                if len(loop_indices) != len(loop_uv_coords):
+                    continue
+
+                for i, loop_idx in enumerate(loop_indices):
+                    target_u, target_v = loop_uv_coords[i]
+                    uv_data[loop_idx].uv = (target_u, target_v)
+
+                transformed_poly_count += 1
+
+    msg = f"Transformed {transformed_poly_count} nail polygon UVs into Arms layout ('{uv_layer.name}')."
+    print(f"[MasterSK] {msg}")
+    return transformed_poly_count, msg
+
+
 def consolidate_pre_split_materials(mesh_obj):
     """
     Step 4 pre-split material consolidation:
-    1. 'Mouth Cavity' -> 'Head' slot.
-    2. 'Fingernails' / 'Toenails' / '*nail*' -> 'Arms' (or 'Body') slot (never Head).
-    Removes emptied material slots cleanly.
+    1. Transforms Fingernail and Toenail UVs to hardcoded Arms UV space layout (UDIM Tile 1004).
+    2. Reassigns 'Mouth Cavity' -> 'Head' slot.
+    3. Reassigns 'Fingernails' / 'Toenails' / '*nail*' -> 'Arms' (or 'Body') slot (never Head).
+    4. Removes emptied material slots cleanly.
     """
     if not mesh_obj or mesh_obj.type != 'MESH' or not mesh_obj.material_slots:
         return ""
 
     logs = []
+
+    # Step 4.0: Apply hardcoded Nails UV transform to Arms layout
+    transformed_nails_count, uv_log = apply_hardcoded_nails_uv_layout(mesh_obj)
+    if transformed_nails_count > 0:
+        logs.append(uv_log)
 
     # 1. Identify Head slot index ('head' in name)
     head_slot_idx = None

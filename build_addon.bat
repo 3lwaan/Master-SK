@@ -26,8 +26,10 @@ copy "%SCRIPT_DIR%operators.py" "%PACKAGE_DIR%\" >nul
 copy "%SCRIPT_DIR%reference_loader.py" "%PACKAGE_DIR%\" >nul
 copy "%SCRIPT_DIR%daz_g9_reference.py" "%PACKAGE_DIR%\" >nul
 if exist "%SCRIPT_DIR%daz_g9_reference.json" copy "%SCRIPT_DIR%daz_g9_reference.json" "%PACKAGE_DIR%\" >nul
+if exist "%SCRIPT_DIR%g9_nails_uv_reference.json" copy "%SCRIPT_DIR%g9_nails_uv_reference.json" "%PACKAGE_DIR%\" >nul
 copy "%SCRIPT_DIR%rig_utils.py" "%PACKAGE_DIR%\" >nul
 if exist "%SCRIPT_DIR%README.md" copy "%SCRIPT_DIR%README.md" "%PACKAGE_DIR%\" >nul
+if exist "%SCRIPT_DIR%CHANGELOG.md" copy "%SCRIPT_DIR%CHANGELOG.md" "%PACKAGE_DIR%\" >nul
 if exist "%SCRIPT_DIR%LICENSE" copy "%SCRIPT_DIR%LICENSE" "%PACKAGE_DIR%\" >nul
 
 echo [*] Packaging addon into %ZIP_NAME%...

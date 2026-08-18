@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Master SK",
     "author": "Gate Studio",
-    "version": (2, 0, 0),
+    "version": (2, 1, 0),
     "blender": (4, 4, 0),
     "location": "View3D > Sidebar > Master SK",
     "description": "Automates DAZ Genesis 9 rig conversion to UE5 / ALS Master Skeleton Hierarchy with modular head separation & material optimization.",
