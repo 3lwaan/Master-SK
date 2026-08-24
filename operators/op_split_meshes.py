@@ -160,5 +160,6 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         scene.mastersk_head_mesh = head_obj
         scene.mastersk_daz_armature = body_arm
 
-        self.report({'INFO'}, f"Step 7 Complete: Split meshes and armatures successfully.")
+        self.report({'INFO'}, "Step 7 Complete: Split head and body meshes non-destructively.")
+        scene.mastersk_progress_step = 8
         return {'FINISHED'}

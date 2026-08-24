@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IK Bone Reconstruction:** Generates perfect IK bones for feet and hands based on the Unreal Engine skeleton, scaled dynamically to prevent viewport clipping.
 - **Joint Roll Locking System:** Safely snaps ALS joints to the Genesis 9 geometry while rigorously preserving the internal UE5 bone lengths, directional vectors, and exact `roll` values.
 - **Spine Alignment Notification Popup:** Explicit warning triggered after Finalization to remind riggers to manually align the `spine_01`, `spine_02`, and `spine_03` Z-axis coordinates to respect arbitrary anatomical mesh weights.
+- **UI State Machine & Dynamic Locking:** The UI now strictly prevents out-of-order execution by disabling uncompleted steps and dynamically unlocking the next step as you progress.
+- **Visual Progress Bar:** Added an intuitive, real-time visual progress tracker to the top of the panel to indicate the current phase of the pipeline.
+- **Progress Reset Functionality:** Added a one-click reset button to clear the pipeline state, allowing users to restart the process easily on a new character.
 
 ### Changed
 - Refactored `bone_math.py` to completely eliminate heuristic Z-offset guessing for spines, deferring to manual alignment to ensure perfect weight envelope preservation.

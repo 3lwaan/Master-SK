@@ -45,4 +45,5 @@ class MASTERSK_OT_snap_joints(bpy.types.Operator):
             return {'CANCELLED'}
 
         self.report({'INFO'}, f"Step 6 Complete: Snapped {snapped_count} ALS bones while preserving original UE axes.")
+        scene.mastersk_progress_step = 7
         return {'FINISHED'}

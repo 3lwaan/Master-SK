@@ -42,10 +42,8 @@ class MASTERSK_OT_map_vertex_groups(bpy.types.Operator):
             config.BONE_NAME_MAPPING
         )
 
-        self.report({'INFO'},
-            f"Step 3 Complete: Renamed {renamed_bones} armature bones and "
-            f"{renamed_vgroups} vertex groups to ALS standard."
-        )
+        self.report({'INFO'}, f"Step 3 Complete: Renamed {renamed_bones} bones and {renamed_vgroups} vertex groups to match UE5 ALS.")
+        scene.mastersk_progress_step = 4
         return {'FINISHED'}
 
     @staticmethod

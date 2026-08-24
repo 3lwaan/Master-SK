@@ -43,5 +43,6 @@ class MASTERSK_OT_append_skeleton(bpy.types.Operator):
         context.view_layer.objects.active = als_armature
         als_armature.select_set(True)
 
-        self.report({'INFO'}, f"Step 5 Complete: Appended '{als_armature.name}' from assets.")
+        self.report({'INFO'}, f"Step 5 Complete: Appended and dynamically scaled ALS Base Skeleton to match Genesis 9.")
+        context.scene.mastersk_progress_step = 6
         return {'FINISHED'}

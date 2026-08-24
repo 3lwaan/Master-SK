@@ -94,7 +94,6 @@ class MASTERSK_OT_match_rest_pose(bpy.types.Operator):
             new_mod = mesh_obj.modifiers.new(name="Armature", type='ARMATURE')
             new_mod.object = arm_obj
 
-        self.report({'INFO'},
-            f"Step 4 Complete: Kinematically aligned {matched} bone chains to ALS A-Pose."
-        )
+        self.report({'INFO'}, "Step 4 Complete: Kinematic matching solved. New ALS A-Pose baked as default rest pose.")
+        scene.mastersk_progress_step = 5
         return {'FINISHED'}

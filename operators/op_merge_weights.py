@@ -79,4 +79,5 @@ class MASTERSK_OT_merge_weights(bpy.types.Operator):
             f"Step 1 Complete: Merged {total_merged} vertex weights across "
             f"{removed_groups} redundant groups. Root bone: '{root_bone_name}'."
         )
+        scene.mastersk_progress_step = 2
         return {'FINISHED'}

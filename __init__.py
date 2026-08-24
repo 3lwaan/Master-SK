@@ -21,7 +21,7 @@ from .operators.op_split_meshes import MASTERSK_OT_split_meshes
 from .operators.op_append_skeleton import MASTERSK_OT_append_skeleton
 from .operators.op_snap_joints import MASTERSK_OT_snap_joints
 from .operators.op_finalize_rigs import MASTERSK_OT_finalize_rigs, MASTERSK_OT_spine_warning_popup
-from .ui.panel import MASTERSK_OT_auto_detect, MASTERSK_PT_main_panel
+from .ui.panel import MASTERSK_OT_auto_detect, MASTERSK_OT_reset_progress, MASTERSK_PT_main_panel
 
 classes = (
     MASTERSK_OT_auto_detect,
@@ -34,6 +34,7 @@ classes = (
     MASTERSK_OT_snap_joints,
     MASTERSK_OT_finalize_rigs,
     MASTERSK_OT_spine_warning_popup,
+    MASTERSK_OT_reset_progress,
     MASTERSK_PT_main_panel,
 )
 
@@ -77,6 +78,14 @@ def register():
         poll=poll_mesh
     )
 
+    bpy.types.Scene.mastersk_progress_step = bpy.props.IntProperty(
+        name="Pipeline Progress",
+        description="Current step in the MasterSK pipeline",
+        default=1,
+        min=1,
+        max=9
+    )
+
     for cls in classes:
         bpy.utils.register_class(cls)
 
@@ -89,6 +98,7 @@ def unregister():
     del bpy.types.Scene.mastersk_als_armature
     del bpy.types.Scene.mastersk_daz_armature
     del bpy.types.Scene.mastersk_mesh_obj
+    del bpy.types.Scene.mastersk_progress_step
 
 if __name__ == "__main__":
     register()

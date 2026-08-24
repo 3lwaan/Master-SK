@@ -179,6 +179,7 @@ class MASTERSK_OT_clean_armature(bpy.types.Operator):
             f"pruned {orphan_removed} orphan VGs. "
             f"Hierarchy: {status}"
         )
+        scene.mastersk_progress_step = 3
         return {'FINISHED'}
 
     @staticmethod

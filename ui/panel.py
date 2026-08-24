@@ -53,6 +53,17 @@ class MASTERSK_OT_auto_detect(bpy.types.Operator):
         context.view_layer.objects.active = obj
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
+class MASTERSK_OT_reset_progress(bpy.types.Operator):
+    """Reset the pipeline progress back to Step 1"""
+    bl_idname = "mastersk.reset_progress"
+    bl_label = "Reset Progress"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        context.scene.mastersk_progress_step = 1
+        self.report({'INFO'}, "Pipeline progress has been reset.")
+        return {'FINISHED'}
+
 class MASTERSK_PT_main_panel(bpy.types.Panel):
     """Main UI Panel for MasterSK Addon"""
     bl_label = "MasterSK - Genesis 9 to ALS"
@@ -89,40 +100,76 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
 
         layout.separator(factor=0.8)
 
-        # 3. Pipeline Steps Box (All 8 buttons with valid Blender 4.4 icons)
+        # 3. Pipeline Steps Box
         box_steps = layout.box()
         box_steps.label(text="Pipeline Steps:", icon='MOD_ARMATURE')
+        
+        # Draw Visual Progress Bar
+        step_val = scene.mastersk_progress_step
+        row_prog = box_steps.row(align=True)
+        for i in range(1, 9):
+            if i < step_val:
+                row_prog.label(text="", icon='CHECKBOX_HLT')
+            elif i == step_val:
+                row_prog.label(text="", icon='PLAY')
+            else:
+                row_prog.label(text="", icon='CHECKBOX_DEHLT')
+
+        if step_val > 8:
+            box_steps.label(text="Pipeline Complete!", icon='FILE_TICK')
+        
+        box_steps.separator()
 
         col = box_steps.column(align=True)
         col.scale_y = 1.2
 
         # Step 1: Merge Weights
-        col.operator("mastersk.merge_weights", text="1. Merge Complex Weights", icon='GROUP_VERTEX')
+        r = col.row()
+        r.enabled = (step_val == 1)
+        r.operator("mastersk.merge_weights", text="1. Merge Complex Weights", icon='GROUP_VERTEX')
         col.separator(factor=0.4)
 
         # Step 2: Clean Armature
-        col.operator("mastersk.clean_armature", text="2. Clean Armature", icon='BONE_DATA')
+        r = col.row()
+        r.enabled = (step_val == 2)
+        r.operator("mastersk.clean_armature", text="2. Clean Armature", icon='BONE_DATA')
         col.separator(factor=0.4)
 
         # Step 3: Rename Bones & Vertex Groups
-        col.operator("mastersk.map_vertex_groups", text="3. Rename Bones & VGroups", icon='OUTLINER_DATA_ARMATURE')
+        r = col.row()
+        r.enabled = (step_val == 3)
+        r.operator("mastersk.map_vertex_groups", text="3. Rename Bones & VGroups", icon='OUTLINER_DATA_ARMATURE')
         col.separator(factor=0.4)
 
         # Step 4: Match Rest Pose (A-Pose)
-        col.operator("mastersk.match_rest_pose", text="4. Match Rest Pose (A-Pose)", icon='ARMATURE_DATA')
+        r = col.row()
+        r.enabled = (step_val == 4)
+        r.operator("mastersk.match_rest_pose", text="4. Match Rest Pose (A-Pose)", icon='ARMATURE_DATA')
         col.separator(factor=0.4)
 
         # Step 5: Append Base Skeleton
-        col.operator("mastersk.append_skeleton", text="5. Append Base Skeleton", icon='APPEND_BLEND')
+        r = col.row()
+        r.enabled = (step_val == 5)
+        r.operator("mastersk.append_skeleton", text="5. Append Base Skeleton", icon='APPEND_BLEND')
         col.separator(factor=0.4)
 
         # Step 6: Snap Joints & Lock Roll
-        col.operator("mastersk.snap_joints", text="6. Snap Joints & Lock Roll", icon='SNAP_ON')
+        r = col.row()
+        r.enabled = (step_val == 6)
+        r.operator("mastersk.snap_joints", text="6. Snap Joints & Lock Roll", icon='SNAP_ON')
         col.separator(factor=0.4)
 
         # Step 7: Split Head & Body Meshes
-        col.operator("mastersk.split_meshes", text="7. Split Head & Body Meshes", icon='MOD_EXPLODE')
+        r = col.row()
+        r.enabled = (step_val == 7)
+        r.operator("mastersk.split_meshes", text="7. Split Head & Body Meshes", icon='MOD_EXPLODE')
         col.separator(factor=0.4)
 
         # Step 8: Finalize & Dual Rig Setup
-        col.operator("mastersk.finalize_rigs", text="8. Finalize & Dual Rig Setup", icon='CHECKMARK')
+        r = col.row()
+        r.enabled = (step_val == 8)
+        r.operator("mastersk.finalize_rigs", text="8. Finalize & Dual Rig Setup", icon='CHECKMARK')
+
+        layout.separator(factor=1.0)
+        row_reset = layout.row()
+        row_reset.operator("mastersk.reset_progress", text="Reset Progress", icon='FILE_REFRESH')

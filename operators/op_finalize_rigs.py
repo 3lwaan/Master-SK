@@ -84,6 +84,7 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
         # Trigger the popup warning for manual spine alignment
         bpy.ops.mastersk.spine_warning_popup('INVOKE_DEFAULT')
         
+        scene.mastersk_progress_step = 9
         return {'FINISHED'}
 
     def transfer_face_bones(self, daz_arm, head_arm):
