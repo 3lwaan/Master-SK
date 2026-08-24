@@ -11,6 +11,9 @@
 ### *Streamline your DAZ G9 character workflow inside Blender and prepare game-ready modular rigs for Unreal Engine 5 & Advanced Locomotion System (ALS) in seconds.*
 
 ---
+!!! this is the legacy version of the "Master SK" blender Addon
+!!! this version is out of date
+!!! you can find the official version in the main branch in ![Master SK Banner](https://github.com/3lwaan/Master-SK/tree/main)
 
 </div>
 
