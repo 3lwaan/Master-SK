@@ -1,0 +1,128 @@
+# MasterSK - 3D Viewport Sidebar Panel
+import bpy
+import os
+from .. import config
+
+class MASTERSK_OT_auto_detect(bpy.types.Operator):
+    """Automatically detect Genesis 9 Mesh and Armature in the active selection or scene"""
+    bl_idname = "mastersk.auto_detect"
+    bl_label = "Auto-Detect Character"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        scene = context.scene
+
+        # Check active and selected objects first
+        for obj in context.selected_objects:
+            if obj.type == 'MESH' and not scene.mastersk_mesh_obj:
+                scene.mastersk_mesh_obj = obj
+            elif obj.type == 'ARMATURE' and not scene.mastersk_daz_armature:
+                if "als" not in obj.name.lower():
+                    scene.mastersk_daz_armature = obj
+
+        # Check all scene objects if still unset
+        for obj in scene.objects:
+            if not scene.mastersk_mesh_obj and obj.type == 'MESH':
+                if any(kw in obj.name.lower() for kw in ["genesis", "g9", "mesh", "lawrence", "body"]):
+                    scene.mastersk_mesh_obj = obj
+            if not scene.mastersk_daz_armature and obj.type == 'ARMATURE':
+                if not any(kw in obj.name.lower() for kw in ["als", "mannequin", "ue"]):
+                    scene.mastersk_daz_armature = obj
+
+        # Apply scale on detected objects to prevent mesh deformation issues
+        self._apply_scale(context, scene.mastersk_daz_armature)
+        self._apply_scale(context, scene.mastersk_mesh_obj)
+
+        self.report({'INFO'}, "Genesis 9 character objects auto-detected (scale applied).")
+        return {'FINISHED'}
+
+    @staticmethod
+    def _apply_scale(context, obj):
+        """Applies the scale transform on the object so scale becomes (1,1,1)."""
+        if not obj:
+            return
+        # Skip if scale is already (1,1,1)
+        s = obj.scale
+        if abs(s.x - 1.0) < 0.0001 and abs(s.y - 1.0) < 0.0001 and abs(s.z - 1.0) < 0.0001:
+            return
+        # Must be in object mode and select only this object
+        if context.object and context.object.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True)
+        context.view_layer.objects.active = obj
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+class MASTERSK_PT_main_panel(bpy.types.Panel):
+    """Main UI Panel for MasterSK Addon"""
+    bl_label = "MasterSK - Genesis 9 to ALS"
+    bl_idname = "MASTERSK_PT_main_panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'MasterSK'
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+
+        # 1. ALS Asset Status Box
+        asset_path = config.get_asset_path()
+        asset_exists = os.path.exists(asset_path)
+
+        box_asset = layout.box()
+        row_asset = box_asset.row(align=True)
+        if asset_exists:
+            row_asset.label(text="ALS Skeleton Asset: Ready", icon='CHECKMARK')
+        else:
+            row_asset.label(text="Asset Missing: assets/als_base_skeleton.blend", icon='ERROR')
+
+        # 2. Character Selection Box (Genesis 9 Mesh & Armature)
+        box_cfg = layout.box()
+        box_cfg.label(text="Genesis 9 Character", icon='OUTLINER_OB_ARMATURE')
+
+        col_cfg = box_cfg.column(align=True)
+        col_cfg.prop_search(scene, "mastersk_mesh_obj", bpy.data, "objects", text="Mesh")
+        col_cfg.prop_search(scene, "mastersk_daz_armature", bpy.data, "objects", text="Armature")
+
+        box_cfg.separator(factor=0.3)
+        box_cfg.operator("mastersk.auto_detect", text="Auto-Detect Character", icon='VIEWZOOM')
+
+        layout.separator(factor=0.8)
+
+        # 3. Pipeline Steps Box (All 8 buttons with valid Blender 4.4 icons)
+        box_steps = layout.box()
+        box_steps.label(text="Pipeline Steps:", icon='MOD_ARMATURE')
+
+        col = box_steps.column(align=True)
+        col.scale_y = 1.2
+
+        # Step 1: Merge Weights
+        col.operator("mastersk.merge_weights", text="1. Merge Complex Weights", icon='GROUP_VERTEX')
+        col.separator(factor=0.4)
+
+        # Step 2: Clean Armature
+        col.operator("mastersk.clean_armature", text="2. Clean Armature", icon='BONE_DATA')
+        col.separator(factor=0.4)
+
+        # Step 3: Rename Bones & Vertex Groups
+        col.operator("mastersk.map_vertex_groups", text="3. Rename Bones & VGroups", icon='OUTLINER_DATA_ARMATURE')
+        col.separator(factor=0.4)
+
+        # Step 4: Match Rest Pose (A-Pose)
+        col.operator("mastersk.match_rest_pose", text="4. Match Rest Pose (A-Pose)", icon='ARMATURE_DATA')
+        col.separator(factor=0.4)
+
+        # Step 5: Append Base Skeleton
+        col.operator("mastersk.append_skeleton", text="5. Append Base Skeleton", icon='APPEND_BLEND')
+        col.separator(factor=0.4)
+
+        # Step 6: Snap Joints & Lock Roll
+        col.operator("mastersk.snap_joints", text="6. Snap Joints & Lock Roll", icon='SNAP_ON')
+        col.separator(factor=0.4)
+
+        # Step 7: Split Head & Body Meshes
+        col.operator("mastersk.split_meshes", text="7. Split Head & Body Meshes", icon='MOD_EXPLODE')
+        col.separator(factor=0.4)
+
+        # Step 8: Finalize & Dual Rig Setup
+        col.operator("mastersk.finalize_rigs", text="8. Finalize & Dual Rig Setup", icon='CHECKMARK')

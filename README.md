@@ -1,104 +1,54 @@
-#  Master SK - Automated DAZ Genesis 9 to UE5 / ALS Pipeline for Blender
+# MasterSK: Genesis 9 to ALS Pipeline
 
-<div align="center">
+![Version](https://img.shields.io/badge/Version-2.0.0-blue.svg)
+![Blender](https://img.shields.io/badge/Blender-4.0+-orange.svg)
+![Unreal Engine](https://img.shields.io/badge/Unreal_Engine-5.0+-black.svg)
 
-![Master SK Banner](https://img.shields.io/badge/Blender-4.4%2B-orange?style=for-the-badge&logo=blender&logoColor=white)
-![Unreal Engine](https://img.shields.io/badge/Unreal_Engine-UE5.0%2B-blue?style=for-the-badge&logo=unrealengine&logoColor=white)
-![DAZ Genesis 9](https://img.shields.io/badge/Character-DAZ_Genesis_9-purple?style=for-the-badge)
-![License](https://img.shields.io/badge/License-GPL_v3-green?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-v2.1.0-brightgreen?style=for-the-badge)
+**MasterSK** is an automated, professional-grade rigging pipeline for Blender that seamlessly bridges high-fidelity Daz3D Genesis 9 characters with Unreal Engine 5's Advanced Locomotion System (ALS). 
 
-### *Streamline your DAZ G9 character workflow inside Blender and prepare game-ready modular rigs for Unreal Engine 5 & Advanced Locomotion System (ALS) in seconds.*
+## Why MasterSK?
 
----
+Integrating Genesis 9 characters into Unreal Engine's ALS ecosystem has traditionally been a frustrating, multi-day manual process involving tedious vertex weight repainting, destructive bone renaming, and highly error-prone joint alignment. 
 
-</div>
-
-##  Why Master SK?
-
-Importing **DAZ Genesis 9** characters into **Unreal Engine 5** or **Advanced Locomotion System (ALS)** manually is notoriously frustrating and time-consuming:
-
-- ❌ **Bloated FBX Files**: Unused morph targets and body shape keys inflate FBX file sizes from ~25MB to over **250MB**, causing massive memory overhead.
-- ❌ **Missing IK Bones**: UE5 and ALS require specific IK bones (`ik_foot_root`, `ik_hand_gun`, etc.) that DAZ rigs lack out of the box.
-- ❌ **Deformation & Weight Issues**: Secondary gender deformations (Pectoral & Glute dynamics) are missing or result in terrible weight paint bleeding.
-- ❌ **Shared Datablock Conflicts**: Splitting head and body armatures manually in Blender often leaves shared edit-bone data blocks, corrupting skeletal transforms upon export.
-- ❌ **Fragmented Material Slots & UV Islands**: Separate material slots for fingernails, toenails, mouth cavity, and teeth waste draw calls and require tedious manual UV repacking.
-
-**Master SK** solves all of these issues with a clean, 5-step automated panel inside Blender!
+MasterSK eliminates this friction by providing a deterministic, 8-step programmatic pipeline. It guarantees 100% mechanical compatibility with the ALS Epic Mannequin while strictly preserving the integrity of the original Genesis 9 anatomical mesh weights and shapes.
 
 ---
 
-## ✨ Key Features
+## How It Works Under The Hood
 
-| Feature | Description |
-| :--- | :--- |
-| **UE5 & ALS Hierarchy Sync** | Automates bone renaming (`hip` -> `pelvis`), hierarchy restructuring, driver target updates, and clears pelvic constraints for full ALS translation. |
-| **Anatomical Gender Variants** | Injects scale-proportional `glute_l` / `glute_r` and `pectoral_l` / `pectoral_r` secondary deformers with topology-aware Laplacian weight paint. |
-| **Automated IK Bone Injection** | Injects 6 essential UE5 IK bones (`ik_foot_root`, `ik_foot_l`, `ik_foot_r`, `ik_hand_root`, `ik_hand_gun`, `ik_hand_l`, `ik_hand_r`). |
-| **Modular Head & Body Split** | Splits meshes into `SKM_Head_Mesh` and `SKM_Body_Mesh`, generates decoupled armatures (`SKM_Face_Rig` & `SKM_Body_Rig`), and purges unused body morphs (~90% file size reduction). |
-| **Nails UV Repositioning & Slot Merge** | Automatically repositions all 1,592 fingernail & toenail UV loops into the central channel of the **Arms** UV map (UDIM Tile 1004) without texture overlap, merging slots cleanly. |
-| **Material Slot Consolidation** | Merges duplicate materials (Teeth -> Mouth, Nails -> Arms, EyeMoisture -> Eyes, Mouth Cavity -> Head) to optimize draw calls for game engine export. |
+MasterSK does not use heuristic guessing. It relies on exact mathematical transformations, direct matrix inversions, and rigid hierarchy replacements.
 
----
-
-## 📦 Installation & Building
-
-### 🛠️ Building from Source (GitHub)
-If you cloned this repository from GitHub:
-1. Double-click **`build_addon.bat`** (or run `.\build_addon.bat` in Terminal).
-2. The script automatically packages all necessary source files into **`master_sk_tools.zip`**.
-
-### 🔌 Installing in Blender
-1. Open Blender 4.4+.
-2. Navigate to **`Edit > Preferences > Add-ons`**.
-3. Click the top-right **`Install...`** button and select `master_sk_tools.zip`.
-4. Enable **`Master SK`** in the addon list.
-5. Open the 3D Viewport sidebar (`N` key) and find the **`Master SK`** tab.
+1. **Weight Consolidation:** Merges complex Genesis 9 driver bones, metacarpals, toes, and twists into their singular UE5 target equivalents (e.g., merging 10 independent toes into the single ALS `ball_l` / `ball_r` groups).
+2. **Armature Pruning:** Strips the Genesis 9 armature down to the exact hierarchy required by ALS, preserving only the whitelist of essential bones.
+3. **Vertex Group Mapping:** Renames the Genesis 9 bones and their corresponding mesh vertex groups simultaneously to perfectly match the ALS naming convention.
+4. **Kinematic Pose Matching:** Solves a kinematic vector alignment to rotate the Genesis 9 bones to precisely match the ALS A-Pose limbs, and bakes this deformation (along with all facial Shape Keys) into the character mesh as the new default rest pose.
+5. **Base Skeleton Injection:** Imports the true UE5 ALS Base Skeleton, dynamically scaling it to match the physical bounds of the Genesis 9 mesh without distorting proportions.
+6. **Joint Snapping (Roll Lock):** Mathematically snaps the head pivots of the ALS joints to the Genesis 9 joint coordinates, while strictly preserving the original ALS local axes (Roll). This ensures the UE5 IK retargeter receives perfect mathematical data.
+7. **Mesh Splitting:** Non-destructively separates the head/face mesh from the body mesh based on material keyword classification, optimizing UV slots and removing internal overlaps (e.g., merging mouth cavities and fingernails).
+8. **Dual Rig Finalization:** Generates two distinct, production-ready output rigs (`root` for the body, `root_head` for the facial rig) tailored for modular UE5 construction. 
 
 ---
 
-## 🛠️ Step-by-Step Workflow Guide
+## Installation
 
-```
- [1. Prepare Character] ──> [Gender Setup (Male/Female)] ──> [2. Rig & Weight Sync]
-                                                                     │
- [5. Join Facial Meshes] <── [4. Modular Head/Body Split] <── [3. Inject IK Bones]
-```
+1. Download or clone this repository.
+2. In Blender, navigate to **Edit** > **Preferences** > **Add-ons**.
+3. Click **Install...** and select the `MasterSK.zip` file.
+4. Enable the checkbox next to **Rigging: MasterSK Pipeline**.
+5. Ensure the `als_base_skeleton.blend` asset file remains within the addon's `assets/` directory.
 
-###  Step 1️⃣: Prepare Character
-- Select your imported DAZ Genesis 9 character armature and mesh.
-- Click **`1. Prepare Active Character`**.
-- *What it does*: Validates selection, applies location/rotation/scale transforms to 1.0, and initializes object references.
+## Usage Guide
 
-### ♀️ Gender Variant Setup (Male / Female)
-- **Set Up Male Variant**: Deletes pectoral and glute bones & vertex groups, rebalancing remaining weights to the torso.
-- **Set Up Female Variant**:
-  - Injects `glute_l` and `glute_r` bones parented to `pelvis`.
-  - Positions bone heads over buttock cheeks with scale-invariant sizing (`hip_width * 0.42`).
-  - Sets exact -15° downward pitch and symmetrical left/right mirror alignment.
-  - Applies Laplacian topology-aware weight painting for smooth, natural deformation.
+MasterSK is designed to be executed sequentially.
 
-###  Step 2️⃣: Rig & Weight Sync
-- Click **`2. Process Rig & Vertex Groups`**.
-- *What it does*: Renames armature object and datablock to `root`, clears pelvic constraints, maps DAZ bones to `MASTER_SK_HIERARCHY`, merges toe/metacarpal/metatarsal weights, and updates driver subtarget references.
+1. Open the **Sidebar (N)** in the 3D Viewport and locate the **MasterSK** tab.
+2. Select your imported Genesis 9 Mesh. The addon will attempt to auto-detect its corresponding Armature.
+3. Execute **Steps 1 through 4** in exact order. 
+4. Execute **Step 5** to append the ALS Reference Skeleton.
+5. Execute **Step 6** to mathematically snap the joints.
+6. Execute **Step 7** to split the head and body meshes.
+7. Execute **Step 8** to finalize the dual rigs. 
+   > **Note:** A prompt will appear reminding you to manually verify the Z-axis placement of the `spine_01`, `spine_02`, and `spine_03` bones in Edit Mode to ensure they visually match your preferred mesh weight envelopes before exporting.
 
-###  Step 3️⃣: Inject IK Bones
-- Click **`3. Inject IK Bones`**.
-- *What it does*: Injects all 6 UE5/ALS IK bones (`ik_foot_root`, `ik_foot_l/r`, `ik_hand_root`, `ik_hand_gun`, `ik_hand_l/r`) with accurate bone tail lengths and parent relationships.
-
-###  Step 4️⃣: Modular Head & Body Split (with Nails UV Transform)
-- Click **`4. Separate Head & Modularize`**.
-- *What it does*:
-  - **Nails UV Transform**: Automatically moves all 1,592 fingernail & toenail UV coordinates into the central channel of **UDIM Tile 1004 (Arms map)**.
-  - **Material Consolidation**: Merges `Fingernails` & `Toenails` -> `Arms`, `Mouth Cavity` -> `Head`, and deletes empty slots.
-  - **Mesh & Rig Decoupling**: Splits `SKM_Head_Mesh` and `SKM_Body_Mesh` and creates single-user datablocks for `SKM_Body_Rig` and `SKM_Face_Rig`.
-  - **Shape Key & Driver Optimization**: Purges unused body shape keys (~90% file size reduction) and drivers while preserving ARKit/Viseme facial morphs on the head.
-
-###  Step 5️⃣: Join Facial Meshes & Materials
-- Click **`5. Join Facial Meshes & Materials`**.
-- *What it does*: Standardizes UV map names (`UVMap`), joins eyes/eyelashes/mouth to the head mesh, consolidates material slots (Teeth -> Mouth, EyeMoisture -> Eyes), and performs a final audit.
-
----
-
-## 📜 Changelog
-See [CHANGELOG.md](CHANGELOG.md) for detailed version history and updates.
+## License
+Proprietary. Developed for internal production pipelines.

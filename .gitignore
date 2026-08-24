@@ -1,0 +1,20 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Blender auto-saves and crash logs
+*.blend1
+*.blend2
+*.blend@
+crash.txt
+blender_debug_output.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
