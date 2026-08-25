@@ -5,6 +5,19 @@ All notable changes to the MasterSK addon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-08-25
+
+### Added
+- **Zero-Length Bone Safeguard:** Added a mathematical scanner during rig generation that detects 0-length Daz helper bones and forces a microscopic tail extension. This prevents Blender's engine from silently purging facial bones upon exiting Edit Mode.
+- **Automated Twist Bone Routing:** The pipeline now automatically transfers the heavy calf weight vertex groups directly to the `calf_twist_01` bones in Step 8, preserving knee articulation geometry during the rest pose matching phase.
+- **Head Rig Expansion:** The Head Rig (`root_head`) now correctly retains the `upperarm` and `upperarm_twist` bones (in addition to the spine, clavicles, and neck) to prevent clipping between modular meshes in Unreal Engine.
+
+### Fixed
+- **The "3 Armatures" Bug:** Fixed an issue where the original Daz armature would survive the pipeline and clutter the scene. Step 8 now explicitly unlinks and forcefully deletes all intermediate armatures using UI-level API commands.
+- **Missing Facial Bones:** Fixed a fatal logic flaw in Step 7 where the global pointer was incorrectly overwritten to the body armature, causing Step 8 to fail to transfer the 64+ facial bones to the Head Rig.
+- **Head Mesh Weight Paint Corruption:** Resolved severe red/blue weight paint distortion on the facial meshes (jaw, teeth, eyes) by ensuring all facial bones seamlessly and perfectly transfer to the Head Rig.
+- **IK Bone Leakage:** Fixed an issue where `ik_foot_root` and `ik_hand_gun` bones were erroneously left inside the Head rig.
+
 ## [2.0.0] - 2026-08-24
 
 ### Added

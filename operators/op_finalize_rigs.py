@@ -43,7 +43,9 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
             head_arm.name = "root_head"
             head_arm.data.name = "root_head"
 
-            self.transfer_face_bones(daz_arm, head_arm)
+            g9_head_arm = bpy.data.objects.get("G9_Head_Armature")
+            if g9_head_arm:
+                self.transfer_face_bones(g9_head_arm, head_arm)
 
             if head_mesh and head_mesh.type == 'MESH':
                 for mod in list(head_mesh.modifiers):
@@ -76,12 +78,17 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
                 "calf_r": "calf_twist_01_r"
             })
 
-        # 5. COMPLETELY Delete original Daz armature (prevents clutter)
-        if daz_arm:
-            try:
-                bpy.data.objects.remove(daz_arm, do_unlink=True)
-            except Exception:
-                pass
+        # 5. COMPLETELY Delete original Daz armatures (prevents clutter)
+        g9_head_arm = bpy.data.objects.get("G9_Head_Armature")
+        for arm_to_delete in [daz_arm, g9_head_arm]:
+            if arm_to_delete:
+                try:
+                    bpy.ops.object.select_all(action='DESELECT')
+                    arm_to_delete.select_set(True)
+                    context.view_layer.objects.active = arm_to_delete
+                    bpy.ops.object.delete(use_global=False, confirm=False)
+                except Exception:
+                    pass
                 
         # 6. Purge orphan data
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
@@ -101,13 +108,10 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
         daz_ebs = daz_arm.data.edit_bones
 
         face_bone_names = []
-        if "head" in daz_ebs:
-            daz_head = daz_ebs["head"]
-            def collect_children(b):
-                for child in b.children:
-                    face_bone_names.append(child.name)
-                    collect_children(child)
-            collect_children(daz_head)
+        als_core_names = set(config.BONE_NAME_MAPPING.values())
+        for b in daz_ebs:
+            if b.name not in als_core_names and b.name not in config.BASE_TORSO_BONES:
+                face_bone_names.append(b.name)
 
         face_bones_data = {}
         for bname in face_bone_names:
@@ -129,7 +133,7 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
 
         bones_to_remove = [
             b.name for b in head_ebs
-            if b.name not in config.BASE_TORSO_BONES and b.name not in config.ALS_IK_BONES
+            if b.name not in config.BASE_TORSO_BONES
         ]
         for bname in bones_to_remove:
             eb = head_ebs.get(bname)
@@ -137,10 +141,17 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
                 head_ebs.remove(eb)
 
         created_bones = {}
+        import mathutils
         for bname, data in face_bones_data.items():
             new_eb = head_ebs.new(bname)
             new_eb.head = data["head"]
-            new_eb.tail = data["tail"]
+            
+            # Safeguard: Blender auto-deletes 0-length bones. Push tail out by 1cm if identical.
+            if (data["tail"] - data["head"]).length < 0.0001:
+                new_eb.tail = data["head"] + mathutils.Vector((0, 0.01, 0))
+            else:
+                new_eb.tail = data["tail"]
+                
             new_eb.roll = data["roll"]
             new_eb.use_deform = data["use_deform"]
             created_bones[bname] = new_eb

@@ -102,7 +102,7 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         
         bones_to_delete = []
         # Target top-level limb bones
-        limb_roots = ["thigh_l", "thigh_r", "upperarm_l", "upperarm_r", "l_pectoral", "r_pectoral", "l_pectoral(drv)", "r_pectoral(drv)"]
+        limb_roots = ["thigh_l", "thigh_r", "lowerarm_l", "lowerarm_r", "l_pectoral", "r_pectoral", "l_pectoral(drv)", "r_pectoral(drv)"]
         
         for root_name in limb_roots:
             b = head_arm.data.edit_bones.get(root_name)

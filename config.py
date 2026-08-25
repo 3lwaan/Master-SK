@@ -244,5 +244,7 @@ ALS_IK_BONES = [
 # ---------------------------------------------------------------------------
 BASE_TORSO_BONES = [
     "pelvis", "spine_01", "spine_02", "spine_03",
-    "clavicle_l", "clavicle_r", "neck_01", "head"
+    "clavicle_l", "clavicle_r", "neck_01", "head",
+    "upperarm_l", "upperarm_twist_01_l",
+    "upperarm_r", "upperarm_twist_01_r"
 ]
