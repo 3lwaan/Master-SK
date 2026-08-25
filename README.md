@@ -1,6 +1,6 @@
 # MasterSK: Genesis 9 to ALS Pipeline
 
-![Version](https://img.shields.io/badge/Version-3.0.0-blue.svg)
+![Version](https://img.shields.io/badge/Version-3.1.0-blue.svg)
 ![Blender](https://img.shields.io/badge/Blender-4.0+-orange.svg)
 ![Unreal Engine](https://img.shields.io/badge/Unreal_Engine-5.0+-black.svg)
 
@@ -24,8 +24,8 @@ MasterSK does not use heuristic guessing. It relies on exact mathematical transf
 4. **Kinematic Pose Matching:** Solves a kinematic vector alignment to rotate the Genesis 9 bones to precisely match the ALS A-Pose limbs, and bakes this deformation (along with all facial Shape Keys) into the character mesh as the new default rest pose.
 5. **Base Skeleton Injection:** Imports the true UE5 ALS Base Skeleton, dynamically scaling it to match the physical bounds of the Genesis 9 mesh without distorting proportions.
 6. **Joint Snapping (Roll Lock):** Mathematically snaps the head pivots of the ALS joints to the Genesis 9 joint coordinates, while strictly preserving the original ALS local axes (Roll). This ensures the UE5 IK retargeter receives perfect mathematical data.
-7. **Mesh Splitting:** Non-destructively separates the head/face mesh from the body mesh based on material keyword classification, optimizing UV slots and removing internal overlaps (e.g., merging mouth cavities and fingernails).
-8. **Dual Rig Finalization:** Generates two distinct, production-ready output rigs (`root` for the body, `root_head` for the facial rig) tailored for modular UE5 construction. The Head Rig seamlessly integrates the spine, clavicles, upper arms, and all 64+ facial bones, powered by a zero-length bone preservation safeguard.
+7. **Mesh Splitting & Morph Pruning:** Non-destructively separates the head/face mesh from the body mesh based on material keyword classification. It automatically merges internal materials (Mouth Cavity to Head), optimizes UVs, and executes a mathematical `numpy` shape key cleaner that instantly purges any morph targets that have zero geometric effect on the newly separated meshes (perfectly isolating ARKit keys to the Head and JCMs to the Body).
+8. **Dual Rig Finalization:** Generates two distinct, production-ready output rigs (`root` for the body, `root_head` for the facial rig) tailored for modular UE5 construction. The Head Rig seamlessly integrates the spine, clavicles, upper arms, and the full uncompromised Daz3D facial skeleton, powered by a zero-length bone preservation safeguard.
 
 ---
 

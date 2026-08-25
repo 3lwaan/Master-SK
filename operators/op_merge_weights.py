@@ -63,9 +63,21 @@ class MASTERSK_OT_merge_weights(bpy.types.Operator):
         resolved_map = {}
         for target, sources in config.WEIGHT_CONSOLIDATION_MAP.items():
             if target == config.ROOT_BONE_SENTINEL:
-                resolved_map[root_bone_name] = sources
+                resolved_map[root_bone_name] = list(sources)
             else:
-                resolved_map[target] = sources
+                resolved_map[target] = list(sources)
+
+        # Dynamically map ALL non-facial (drv) bones to their base bones if not already mapped
+        for bone in arm_obj.data.bones:
+            if bone.name.endswith("(drv)"):
+                base_name = bone.name[:-5]
+                if base_name in arm_obj.data.bones:
+                    if base_name not in resolved_map:
+                        resolved_map[base_name] = []
+                    if bone.name not in resolved_map[base_name]:
+                        resolved_map[base_name].append(bone.name)
+
+
 
         total_merged, removed_groups = weight_utils.merge_vertex_groups(
             mesh_obj,

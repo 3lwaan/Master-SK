@@ -5,6 +5,12 @@ All notable changes to the MasterSK addon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-08-25
+
+### Added
+- **Mathematical Shape Key Cleaner (Step 7):** Added a highly optimized `numpy` scanner that executes instantly after the meshes are split. It scans every vertex of every shape key and permanently deletes keys that have absolutely zero geometric effect on the remaining mesh. This ensures the Head mesh only retains facial morphs, and the Body mesh only retains body JCMs, resulting in perfectly optimized Live Link assets.
+- **Full Facial Rig Restoration:** Reverted the aggressive facial bone pruning logic to properly retain the entire Daz3D facial bone hierarchy. The script still intelligently identifies and annihilates heavy `(drv)` helper bones in Step 2, but preserves all standard poseable facial bones, enabling perfect traditional facial animation alongside ARKit shape keys.
+
 ## [3.0.0] - 2026-08-25
 
 ### Added

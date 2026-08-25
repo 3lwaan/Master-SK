@@ -25,6 +25,36 @@ def clean_vertex_groups(mesh_obj, armature_obj):
     for vg in vgs_to_delete:
         mesh_obj.vertex_groups.remove(vg)
 
+def clean_empty_shape_keys(obj):
+    """Deletes shape keys that have zero geometric effect on the remaining mesh vertices."""
+    if not obj.data.shape_keys:
+        return 0
+    
+    import numpy as np
+    
+    basis = obj.data.shape_keys.key_blocks[0]
+    v_count = len(basis.data)
+    if v_count == 0:
+        return 0
+        
+    basis_co = np.zeros(v_count * 3, dtype=np.float32)
+    basis.data.foreach_get("co", basis_co)
+    target_co = np.zeros(v_count * 3, dtype=np.float32)
+    
+    removed_count = 0
+    blocks = obj.data.shape_keys.key_blocks
+    
+    for i in range(len(blocks)-1, 0, -1):
+        kb = blocks[i]
+        kb.data.foreach_get("co", target_co)
+        
+        diff = np.abs(target_co - basis_co)
+        if np.max(diff) < 0.0001:
+            obj.shape_key_remove(kb)
+            removed_count += 1
+            
+    return removed_count
+
 class MASTERSK_OT_split_meshes(bpy.types.Operator):
     """Step 7: Separate the character mesh and rig into Head and Body components"""
     bl_idname = "mastersk.split_meshes"
@@ -154,12 +184,18 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         clean_vertex_groups(head_obj, head_arm)
         clean_vertex_groups(body_obj, body_arm)
 
+        # ---------------------------------------------------------------------
+        # 7. CLEAN EMPTY SHAPE KEYS
+        # ---------------------------------------------------------------------
+        head_sk_rm = clean_empty_shape_keys(head_obj)
+        body_sk_rm = clean_empty_shape_keys(body_obj)
+
         # Update scene variables
         scene.mastersk_mesh_obj = body_obj
         scene.mastersk_body_mesh = body_obj
         scene.mastersk_head_mesh = head_obj
         scene.mastersk_daz_armature = body_arm
 
-        self.report({'INFO'}, "Step 7 Complete: Split head and body meshes non-destructively.")
+        self.report({'INFO'}, f"Step 7 Complete: Split meshes. Pruned SKs (Head: {head_sk_rm}, Body: {body_sk_rm})")
         scene.mastersk_progress_step = 8
         return {'FINISHED'}

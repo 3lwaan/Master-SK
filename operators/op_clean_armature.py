@@ -181,13 +181,14 @@ class MASTERSK_OT_clean_armature(bpy.types.Operator):
         )
         scene.mastersk_progress_step = 3
         return {'FINISHED'}
-
     @staticmethod
     def _collect_all_children(bone, result_set):
-        """Recursively collects all children bone names into result_set."""
+        """Recursively collects all children bone names into result_set (excluding drv bones)."""
         for child in bone.children:
-            result_set.add(child.name)
+            if not child.name.endswith("(drv)"):
+                result_set.add(child.name)
             MASTERSK_OT_clean_armature._collect_all_children(child, result_set)
+
 
     @staticmethod
     def _find_surviving_parent(edit_bone, delete_set, edit_bones):
