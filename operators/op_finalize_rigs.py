@@ -1,6 +1,6 @@
-# MasterSK - Step 8: Finalize Dual Rigs Operator
 import bpy
 from .. import config
+from ..core import weight_utils
 
 class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
     """Step 8: Construct ALS Body Skeleton and ALS Head/Face Skeleton, bind meshes, and organize collections"""
@@ -69,14 +69,21 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
         # 3. Organize Scene Collections
         self.organize_collections(context, als_arm, body_mesh, head_arm, head_mesh)
 
-        # 4. COMPLETELY Delete original Daz armature (prevents clutter)
+        # 4. Transfer Calf Weights to Twist Bones
+        if body_mesh and body_mesh.type == 'MESH':
+            weight_utils.rename_vertex_groups(body_mesh, {
+                "calf_l": "calf_twist_01_l",
+                "calf_r": "calf_twist_01_r"
+            })
+
+        # 5. COMPLETELY Delete original Daz armature (prevents clutter)
         if daz_arm:
             try:
                 bpy.data.objects.remove(daz_arm, do_unlink=True)
             except Exception:
                 pass
                 
-        # 5. Purge orphan data
+        # 6. Purge orphan data
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
 
         self.report({'INFO'}, "Step 8 Complete: Generated clean 'root' and 'root_head' dual rigs ready for Unreal Engine 5.")
