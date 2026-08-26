@@ -78,17 +78,34 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
                 "calf_r": "calf_twist_01_r"
             })
 
-        # 5. COMPLETELY Delete original Daz armatures (prevents clutter)
+        # 5. Hide original Daz armature (needed for mathematically perfect ROM generator)
+        data_col = bpy.data.collections.get("MasterSK_Data")
+        if not data_col:
+            data_col = bpy.data.collections.new("MasterSK_Data")
+            scene.collection.children.link(data_col)
+            
+        # Hide the collection from viewport and render
+        data_col.hide_viewport = True
+        data_col.hide_render = True
+        
+        if daz_arm:
+            for c in list(daz_arm.users_collection):
+                c.objects.unlink(daz_arm)
+            data_col.objects.link(daz_arm)
+            # Ensure it is in rest pose just in case
+            if daz_arm.type == 'ARMATURE':
+                for pb in daz_arm.pose.bones:
+                    pb.matrix_basis.identity()
+
         g9_head_arm = bpy.data.objects.get("G9_Head_Armature")
-        for arm_to_delete in [daz_arm, g9_head_arm]:
-            if arm_to_delete:
-                try:
-                    bpy.ops.object.select_all(action='DESELECT')
-                    arm_to_delete.select_set(True)
-                    context.view_layer.objects.active = arm_to_delete
-                    bpy.ops.object.delete(use_global=False, confirm=False)
-                except Exception:
-                    pass
+        if g9_head_arm:
+            try:
+                bpy.ops.object.select_all(action='DESELECT')
+                g9_head_arm.select_set(True)
+                context.view_layer.objects.active = g9_head_arm
+                bpy.ops.object.delete(use_global=False, confirm=False)
+            except Exception:
+                pass
                 
         # 6. Purge orphan data
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)

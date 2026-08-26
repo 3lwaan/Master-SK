@@ -308,3 +308,568 @@ ARKIT_BAKING_MAP = {
     "NoseSneerRight": ["facs_bs_NoseSneerRight"],
     "TongueOut": ["facs_bs_TongueOut"]
 }
+
+
+# Mapping for Body Muscle JCMs to AAA Names and ROM Rotations
+JCM_AAA_NAMING_MAP = \
+{
+    "FlexBicepsL": {
+        "new_name": "BicepsFlexLeft",
+        "daz_bone": "lowerarm_l",
+        "rotations": {
+            "Y": 135
+        }
+    },
+    "FlexBicepsR": {
+        "new_name": "BicepsFlexRight",
+        "daz_bone": "lowerarm_r",
+        "rotations": {
+            "Y": 135
+        }
+    },
+    "FlexCalfL": {
+        "new_name": "CalfFlexLeft",
+        "daz_bone": "calf_l",
+        "rotations": {
+            "X": 155
+        }
+    },
+    "FlexCalfR": {
+        "new_name": "CalfFlexRight",
+        "daz_bone": "calf_r",
+        "rotations": {
+            "X": 155
+        }
+    },
+    "FlexGluteClenchL": {
+        "new_name": "GluteClenchFlexLeft",
+        "daz_bone": "None",
+        "rotations": {
+            "X": 0
+        }
+    },
+    "FlexGluteClenchR": {
+        "new_name": "GluteClenchFlexRight",
+        "daz_bone": "None",
+        "rotations": {
+            "X": 0
+        }
+    },
+    "FlexHamstringL": {
+        "new_name": "HamstringFlexLeft",
+        "daz_bone": "calf_l",
+        "rotations": {
+            "X": 155
+        }
+    },
+    "FlexHamstringR": {
+        "new_name": "HamstringFlexRight",
+        "daz_bone": "calf_r",
+        "rotations": {
+            "X": 155
+        }
+    },
+    "FlexQuadL": {
+        "new_name": "QuadFlexLeft",
+        "daz_bone": "calf_l",
+        "rotations": {
+            "X": -90
+        }
+    },
+    "FlexQuadR": {
+        "new_name": "QuadFlexRight",
+        "daz_bone": "calf_r",
+        "rotations": {
+            "X": -90
+        }
+    },
+    "FlexShoulderUpperBackL": {
+        "new_name": "ShoulderUpperBackFlexLeft",
+        "daz_bone": "None",
+        "rotations": {
+            "X": 0
+        }
+    },
+    "FlexShoulderUpperBackR": {
+        "new_name": "ShoulderUpperBackFlexRight",
+        "daz_bone": "None",
+        "rotations": {
+            "X": 0
+        }
+    },
+    "FlexTricepsL": {
+        "new_name": "TricepsFlexLeft",
+        "daz_bone": "lowerarm_l",
+        "rotations": {
+            "Y": -90
+        }
+    },
+    "FlexTricepsR": {
+        "new_name": "TricepsFlexRight",
+        "daz_bone": "lowerarm_r",
+        "rotations": {
+            "Y": -90
+        }
+    },
+    "foot_x45n_l": {
+        "new_name": "FootPitchDown45Left",
+        "daz_bone": "foot_l",
+        "rotations": {
+            "X": -45
+        }
+    },
+    "foot_x45n_r": {
+        "new_name": "FootPitchDown45Right",
+        "daz_bone": "foot_r",
+        "rotations": {
+            "X": -45
+        }
+    },
+    "foot_x65p_l": {
+        "new_name": "FootPitchUp65Left",
+        "daz_bone": "foot_l",
+        "rotations": {
+            "X": 65
+        }
+    },
+    "foot_x65p_r": {
+        "new_name": "FootPitchUp65Right",
+        "daz_bone": "foot_r",
+        "rotations": {
+            "X": 65
+        }
+    },
+    "foot_z45n_l": {
+        "new_name": "FootYawLeft45Left",
+        "daz_bone": "foot_l",
+        "rotations": {
+            "Z": -45
+        }
+    },
+    "foot_z45p_r": {
+        "new_name": "FootYawRight45Right",
+        "daz_bone": "foot_r",
+        "rotations": {
+            "Z": 45
+        }
+    },
+    "forearm_y135n_l": {
+        "new_name": "ElbowBendIn135Left",
+        "daz_bone": "lowerarm_l",
+        "rotations": {
+            "Y": -135
+        }
+    },
+    "forearm_y135p_r": {
+        "new_name": "ElbowBendOut135Right",
+        "daz_bone": "lowerarm_r",
+        "rotations": {
+            "Y": 135
+        }
+    },
+    "forearm_y75n_l": {
+        "new_name": "ElbowBendIn75Left",
+        "daz_bone": "lowerarm_l",
+        "rotations": {
+            "Y": -75
+        }
+    },
+    "forearm_y75p_r": {
+        "new_name": "ElbowBendOut75Right",
+        "daz_bone": "lowerarm_r",
+        "rotations": {
+            "Y": 75
+        }
+    },
+    "hand_y28n_l": {
+        "new_name": "HandBendIn28Left",
+        "daz_bone": "hand_l",
+        "rotations": {
+            "Y": -28
+        }
+    },
+    "hand_y28p_r": {
+        "new_name": "HandBendOut28Right",
+        "daz_bone": "hand_r",
+        "rotations": {
+            "Y": 28
+        }
+    },
+    "hand_z70n_l": {
+        "new_name": "HandYawLeft70Left",
+        "daz_bone": "hand_l",
+        "rotations": {
+            "Z": -70
+        }
+    },
+    "hand_z70p_r": {
+        "new_name": "HandYawRight70Right",
+        "daz_bone": "hand_r",
+        "rotations": {
+            "Z": 70
+        }
+    },
+    "hand_z80n_r": {
+        "new_name": "HandYawLeft80Right",
+        "daz_bone": "hand_r",
+        "rotations": {
+            "Z": -80
+        }
+    },
+    "hand_z80p_l": {
+        "new_name": "HandYawRight80Left",
+        "daz_bone": "hand_l",
+        "rotations": {
+            "Z": 80
+        }
+    },
+    "neck1_x25n": {
+        "new_name": "Neck1PitchDown25",
+        "daz_bone": "neck_01",
+        "rotations": {
+            "X": -25
+        }
+    },
+    "neck1_x40p": {
+        "new_name": "Neck1PitchUp40",
+        "daz_bone": "neck_01",
+        "rotations": {
+            "X": 40
+        }
+    },
+    "neck1_z40n_l": {
+        "new_name": "Neck1YawLeft40Left",
+        "daz_bone": "neck_01_l",
+        "rotations": {
+            "Z": -40
+        }
+    },
+    "neck1_z40p_r": {
+        "new_name": "Neck1YawRight40Right",
+        "daz_bone": "neck_01_r",
+        "rotations": {
+            "Z": 40
+        }
+    },
+    "pelvis_x25n": {
+        "new_name": "PelvisPitchDown25",
+        "daz_bone": "pelvis",
+        "rotations": {
+            "X": -25
+        }
+    },
+    "pelvis_x25p": {
+        "new_name": "PelvisPitchUp25",
+        "daz_bone": "pelvis",
+        "rotations": {
+            "X": 25
+        }
+    },
+    "shin_x155p_l": {
+        "new_name": "ShinPitchUp155Left",
+        "daz_bone": "calf_l",
+        "rotations": {
+            "X": 155
+        }
+    },
+    "shin_x155p_r": {
+        "new_name": "ShinPitchUp155Right",
+        "daz_bone": "calf_r",
+        "rotations": {
+            "X": 155
+        }
+    },
+    "shin_x90p_l": {
+        "new_name": "ShinPitchUp90Left",
+        "daz_bone": "calf_l",
+        "rotations": {
+            "X": 90
+        }
+    },
+    "shin_x90p_r": {
+        "new_name": "ShinPitchUp90Right",
+        "daz_bone": "calf_r",
+        "rotations": {
+            "X": 90
+        }
+    },
+    "shoulder_x30n_l": {
+        "new_name": "ShoulderPitchDown30Left",
+        "daz_bone": "clavicle_l",
+        "rotations": {
+            "X": -30
+        }
+    },
+    "shoulder_x30n_r": {
+        "new_name": "ShoulderPitchDown30Right",
+        "daz_bone": "clavicle_r",
+        "rotations": {
+            "X": -30
+        }
+    },
+    "shoulder_x30p_l": {
+        "new_name": "ShoulderPitchUp30Left",
+        "daz_bone": "clavicle_l",
+        "rotations": {
+            "X": 30
+        }
+    },
+    "shoulder_x30p_r": {
+        "new_name": "ShoulderPitchUp30Right",
+        "daz_bone": "clavicle_r",
+        "rotations": {
+            "X": 30
+        }
+    },
+    "shoulder_z55n_r": {
+        "new_name": "ShoulderYawLeft55Right",
+        "daz_bone": "clavicle_r",
+        "rotations": {
+            "Z": -55
+        }
+    },
+    "shoulder_z55p_l": {
+        "new_name": "ShoulderYawRight55Left",
+        "daz_bone": "clavicle_l",
+        "rotations": {
+            "Z": 55
+        }
+    },
+    "spine1_x35p": {
+        "new_name": "Spine1PitchUp35",
+        "daz_bone": "spine_01",
+        "rotations": {
+            "X": 35
+        }
+    },
+    "spine1_z15n_l": {
+        "new_name": "Spine1YawLeft15Left",
+        "daz_bone": "spine_01_l",
+        "rotations": {
+            "Z": -15
+        }
+    },
+    "spine1_z15p_r": {
+        "new_name": "Spine1YawRight15Right",
+        "daz_bone": "spine_01_r",
+        "rotations": {
+            "Z": 15
+        }
+    },
+    "spine2_x40p": {
+        "new_name": "Spine2PitchUp40",
+        "daz_bone": "spine_02",
+        "rotations": {
+            "X": 40
+        }
+    },
+    "spine2_z24n_l": {
+        "new_name": "Spine2YawLeft24Left",
+        "daz_bone": "spine_02_l",
+        "rotations": {
+            "Z": -24
+        }
+    },
+    "spine2_z24p_r": {
+        "new_name": "Spine2YawRight24Right",
+        "daz_bone": "spine_02_r",
+        "rotations": {
+            "Z": 24
+        }
+    },
+    "spine3_x35p": {
+        "new_name": "Spine3PitchUp35",
+        "daz_bone": "spine_03",
+        "rotations": {
+            "X": 35
+        }
+    },
+    "spine3_z20n_l": {
+        "new_name": "Spine3YawLeft20Left",
+        "daz_bone": "spine_03_l",
+        "rotations": {
+            "Z": -20
+        }
+    },
+    "spine3_z20p_r": {
+        "new_name": "Spine3YawRight20Right",
+        "daz_bone": "spine_03_r",
+        "rotations": {
+            "Z": 20
+        }
+    },
+    "thigh_x115n_l": {
+        "new_name": "ThighPitchDown115Left",
+        "daz_bone": "thigh_l",
+        "rotations": {
+            "X": -115
+        }
+    },
+    "thigh_x115n_r": {
+        "new_name": "ThighPitchDown115Right",
+        "daz_bone": "thigh_r",
+        "rotations": {
+            "X": -115
+        }
+    },
+    "thigh_x115n_z90n_r": {
+        "new_name": "ThighPitchDown115YawLeft90Right",
+        "daz_bone": "thigh_r",
+        "rotations": {
+            "X": -115,
+            "Z": -90
+        }
+    },
+    "thigh_x115n_z90p_l": {
+        "new_name": "ThighPitchDown115YawRight90Left",
+        "daz_bone": "thigh_l",
+        "rotations": {
+            "X": -115,
+            "Z": 90
+        }
+    },
+    "thigh_x35p_l": {
+        "new_name": "ThighPitchUp35Left",
+        "daz_bone": "thigh_l",
+        "rotations": {
+            "X": 35
+        }
+    },
+    "thigh_x35p_r": {
+        "new_name": "ThighPitchUp35Right",
+        "daz_bone": "thigh_r",
+        "rotations": {
+            "X": 35
+        }
+    },
+    "thigh_x90n_l": {
+        "new_name": "ThighPitchDown90Left",
+        "daz_bone": "thigh_l",
+        "rotations": {
+            "X": -90
+        }
+    },
+    "thigh_x90n_r": {
+        "new_name": "ThighPitchDown90Right",
+        "daz_bone": "thigh_r",
+        "rotations": {
+            "X": -90
+        }
+    },
+    "thigh_z90n_r": {
+        "new_name": "ThighYawLeft90Right",
+        "daz_bone": "thigh_r",
+        "rotations": {
+            "Z": -90
+        }
+    },
+    "thigh_z90p_l": {
+        "new_name": "ThighYawRight90Left",
+        "daz_bone": "thigh_l",
+        "rotations": {
+            "Z": 90
+        }
+    },
+    "upperarm_x95n_l": {
+        "new_name": "UpperarmPitchDown95Left",
+        "daz_bone": "upperarm_l",
+        "rotations": {
+            "X": -95
+        }
+    },
+    "upperarm_x95n_r": {
+        "new_name": "UpperarmPitchDown95Right",
+        "daz_bone": "upperarm_r",
+        "rotations": {
+            "X": -95
+        }
+    },
+    "upperarm_y110n_l": {
+        "new_name": "UpperarmBendIn110Left",
+        "daz_bone": "upperarm_l",
+        "rotations": {
+            "Y": -110
+        }
+    },
+    "upperarm_y110n_z40n_l": {
+        "new_name": "UpperarmBendIn110YawLeft40Left",
+        "daz_bone": "upperarm_l",
+        "rotations": {
+            "Y": -110,
+            "Z": -40
+        }
+    },
+    "upperarm_y110n_z90p_l": {
+        "new_name": "UpperarmBendIn110YawRight90Left",
+        "daz_bone": "upperarm_l",
+        "rotations": {
+            "Y": -110,
+            "Z": 90
+        }
+    },
+    "upperarm_y110p_r": {
+        "new_name": "UpperarmBendOut110Right",
+        "daz_bone": "upperarm_r",
+        "rotations": {
+            "Y": 110
+        }
+    },
+    "upperarm_y110p_z40p_r": {
+        "new_name": "UpperarmBendOut110YawRight40Right",
+        "daz_bone": "upperarm_r",
+        "rotations": {
+            "Y": 110,
+            "Z": 40
+        }
+    },
+    "upperarm_y110p_z90n_r": {
+        "new_name": "UpperarmBendOut110YawLeft90Right",
+        "daz_bone": "upperarm_r",
+        "rotations": {
+            "Y": 110,
+            "Z": -90
+        }
+    },
+    "upperarm_z40n_l": {
+        "new_name": "UpperarmYawLeft40Left",
+        "daz_bone": "upperarm_l",
+        "rotations": {
+            "Z": -40
+        }
+    },
+    "upperarm_z40p_r": {
+        "new_name": "UpperarmYawRight40Right",
+        "daz_bone": "upperarm_r",
+        "rotations": {
+            "Z": 40
+        }
+    },
+    "upperarm_z90n_r": {
+        "new_name": "UpperarmYawLeft90Right",
+        "daz_bone": "upperarm_r",
+        "rotations": {
+            "Z": -90
+        }
+    },
+    "upperarm_z90p_l": {
+        "new_name": "UpperarmYawRight90Left",
+        "daz_bone": "upperarm_l",
+        "rotations": {
+            "Z": 90
+        }
+    },
+    "facs_bs_NeckFlexLeft": {
+        "new_name": "NeckFlexLeft",
+        "daz_bone": "neck_01",
+        "rotations": {
+            "Z": 40
+        }
+    },
+    "facs_bs_NeckFlexRight": {
+        "new_name": "NeckFlexRight",
+        "daz_bone": "neck_01",
+        "rotations": {
+            "Z": -40
+        }
+    }
+}

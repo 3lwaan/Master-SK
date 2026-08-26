@@ -104,16 +104,13 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         box_import = layout.box()
         box_import.label(text="Pre-Requisite: Daz Import", icon='INFO')
         col_import = box_import.column(align=True)
-        col_import.label(text="In Daz Importer, click 'Import Standard Morphs'")
-        col_import.label(text="Check: FACS, JCMs, Transfer To Face Meshes")
-        col_import.label(text="Uncheck: FACS Details")
-        box_import.prop(scene, "mastersk_morphs_imported", text="I have imported the target morphs")
-
+        col_import.label(text="Keep the default flexes morphs.")
+        col_import.label(text="Do NOT import any FACS or JCM morphs.")
+        
         layout.separator(factor=0.8)
 
         # 4. Pipeline Steps Box
         box_steps = layout.box()
-        box_steps.enabled = scene.mastersk_morphs_imported
         box_steps.label(text="Pipeline Steps:", icon='MOD_ARMATURE')
         
         # Draw Visual Progress Bar
@@ -181,6 +178,12 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         r = col.row()
         r.enabled = (step_val == 8)
         r.operator("mastersk.finalize_rigs", text="8. Finalize & Dual Rig Setup", icon='CHECKMARK')
+        col.separator(factor=0.4)
+
+        # Step 9: Generate ROM Animation (Optional)
+        r = col.row()
+        r.enabled = (step_val >= 8) # Can run after 8
+        r.operator("mastersk.generate_rom", text="9. Generate JCM ROM (Optional)", icon='ACTION')
 
         # 5. Post-Processing Reminder
         layout.separator(factor=1.0)
@@ -195,3 +198,7 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         layout.separator(factor=1.0)
         row_reset = layout.row()
         row_reset.operator("mastersk.reset_progress", text="Reset Progress", icon='FILE_REFRESH')
+
+
+
+

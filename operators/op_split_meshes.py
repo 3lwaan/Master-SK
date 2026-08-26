@@ -58,7 +58,7 @@ def clean_empty_shape_keys(obj):
 def bake_arkit_shape_keys(obj):
     """Bakes Daz FACS shape keys into the 52 standard Apple ARKit shape keys and deletes the rest."""
     if not obj.data.shape_keys:
-        return 0
+        return 0, 0
         
     import numpy as np
     
@@ -66,7 +66,7 @@ def bake_arkit_shape_keys(obj):
     basis = obj.data.shape_keys.key_blocks[0]
     v_count = len(basis.data)
     if v_count == 0:
-        return 0
+        return 0, 0
         
     basis_co = np.zeros(v_count * 3, dtype=np.float32)
     basis.data.foreach_get("co", basis_co)
@@ -106,23 +106,52 @@ def bake_arkit_shape_keys(obj):
             
     return baked_count, deleted_count
 
-def clean_body_shape_keys(obj):
-    """Strips Daz prefixes from body JCMs."""
-    if not obj.data.shape_keys:
+def clean_body_shape_keys(body_obj):
+    """
+    Cleans the body shape keys by renaming them to AAA standards.
+    Strips prefixes and applies professional naming conventions (e.g. Foot_PitchDown_L)
+    Also permanently deletes any leftover drivers, as UE5 will use Pose Assets.
+    """
+    if not body_obj.data.shape_keys:
         return 0
         
-    renamed = 0
-    for kb in obj.data.shape_keys.key_blocks:
-        old_name = kb.name
-        if kb.name.startswith("body_bs_"):
-            kb.name = kb.name.replace("body_bs_", "")
-        elif kb.name.startswith("body_cbs_"):
-            kb.name = kb.name.replace("body_cbs_", "")
+    # Delete drivers from the body mesh shape keys
+    if body_obj.data.shape_keys.animation_data:
+        body_obj.data.shape_keys.animation_data_clear()
+
+    cleaned_count = 0
+    for sk in body_obj.data.shape_keys.key_blocks:
+        if sk.name == "Basis":
+            continue
+
+        # Clear invalid vertex group masks that were broken by renaming
+        sk.vertex_group = ""
+
+        # Map to AAA names
+        original_name = sk.name
+        # If the original name starts with body_bs_ or body_cbs_, we might need to strip it first to match the config
+        # Wait, our config map uses keys like "body_cbs_foot_x45n_l", so we should check exactly.
+        # But the map generator used "foot_x45n_l" and "FlexBicepsL".
+        # Let's clean the prefix for the lookup.
+        lookup_name = original_name
+        if lookup_name.startswith("body_bs_"):
+            lookup_name = lookup_name.replace("body_bs_", "")
+        elif lookup_name.startswith("body_cbs_"):
+            lookup_name = lookup_name.replace("body_cbs_", "")
             
-        if old_name != kb.name:
-            renamed += 1
-            
-    return renamed
+        if lookup_name in config.JCM_AAA_NAMING_MAP:
+            sk.name = config.JCM_AAA_NAMING_MAP[lookup_name]["new_name"]
+            cleaned_count += 1
+        else:
+            # Fallback just strip prefixes if somehow missed
+            if original_name.startswith("body_bs_"):
+                sk.name = original_name.replace("body_bs_", "")
+                cleaned_count += 1
+            elif original_name.startswith("body_cbs_"):
+                sk.name = original_name.replace("body_cbs_", "")
+                cleaned_count += 1
+
+    return cleaned_count
 
 class MASTERSK_OT_split_meshes(bpy.types.Operator):
     """Step 7: Separate the character mesh and rig into Head and Body components"""
@@ -256,12 +285,13 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         # ---------------------------------------------------------------------
         # 7. CLEAN AND BAKE SHAPE KEYS
         # ---------------------------------------------------------------------
-        # Empty cleaner ensures body JCMs are purged from head, and FACS from body
-        clean_empty_shape_keys(head_obj)
+        # Bake ARKit for Head FIRST so controllers are evaluated!
+        baked, deleted = bake_arkit_shape_keys(head_obj)
+        
+        # Empty cleaner ensures body JCMs are purged from body, and empty ones are deleted
         clean_empty_shape_keys(body_obj)
         
-        # Bake ARKit for Head, Rename JCMs for Body
-        baked, deleted = bake_arkit_shape_keys(head_obj)
+        # Rename JCMs for Body
         renamed = clean_body_shape_keys(body_obj)
 
         # Update scene variables
@@ -273,3 +303,4 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         self.report({'INFO'}, f"Step 7 Complete: Baked {baked} ARKit keys, Purged {deleted} FACS keys, Renamed {renamed} JCMs.")
         scene.mastersk_progress_step = 8
         return {'FINISHED'}
+
