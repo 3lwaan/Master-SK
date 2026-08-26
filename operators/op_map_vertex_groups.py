@@ -42,7 +42,12 @@ class MASTERSK_OT_map_vertex_groups(bpy.types.Operator):
             config.BONE_NAME_MAPPING
         )
 
-        self.report({'INFO'}, f"Step 3 Complete: Renamed {renamed_bones} bones and {renamed_vgroups} vertex groups to match UE5 ALS.")
+        # --- Phase 3: Dynamic Prefix to Suffix Renaming ---
+        # Converts remaining bones like 'l_ear' to 'ear_l' for Unreal compliance
+        dynamic_bones = self.rename_dynamic_prefixes(arm_obj)
+        dynamic_vgroups = weight_utils.rename_dynamic_vertex_groups(mesh_obj)
+
+        self.report({'INFO'}, f"Step 3 Complete: Renamed {renamed_bones + dynamic_bones} bones and {renamed_vgroups + dynamic_vgroups} vertex groups.")
         scene.mastersk_progress_step = 4
         return {'FINISHED'}
 
@@ -69,6 +74,32 @@ class MASTERSK_OT_map_vertex_groups(bpy.types.Operator):
                     continue
                 eb.name = new_name
                 renamed_count += 1
+
+        bpy.ops.object.mode_set(mode='OBJECT')
+        return renamed_count
+
+    @staticmethod
+    def rename_dynamic_prefixes(arm_obj):
+        """
+        Catches any remaining bones with 'l_' or 'r_' prefixes (like facial bones)
+        and converts them to Unreal Engine '_l' / '_r' suffixes.
+        """
+        bpy.context.view_layer.objects.active = arm_obj
+        bpy.ops.object.mode_set(mode='EDIT')
+        edit_bones = arm_obj.data.edit_bones
+
+        renamed_count = 0
+        for eb in edit_bones:
+            if eb.name.startswith("l_"):
+                new_name = eb.name[2:] + "_l"
+                if not edit_bones.get(new_name):
+                    eb.name = new_name
+                    renamed_count += 1
+            elif eb.name.startswith("r_"):
+                new_name = eb.name[2:] + "_r"
+                if not edit_bones.get(new_name):
+                    eb.name = new_name
+                    renamed_count += 1
 
         bpy.ops.object.mode_set(mode='OBJECT')
         return renamed_count

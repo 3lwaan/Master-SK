@@ -55,6 +55,75 @@ def clean_empty_shape_keys(obj):
             
     return removed_count
 
+def bake_arkit_shape_keys(obj):
+    """Bakes Daz FACS shape keys into the 52 standard Apple ARKit shape keys and deletes the rest."""
+    if not obj.data.shape_keys:
+        return 0
+        
+    import numpy as np
+    
+    existing_kbs = {kb.name: kb for kb in obj.data.shape_keys.key_blocks}
+    basis = obj.data.shape_keys.key_blocks[0]
+    v_count = len(basis.data)
+    if v_count == 0:
+        return 0
+        
+    basis_co = np.zeros(v_count * 3, dtype=np.float32)
+    basis.data.foreach_get("co", basis_co)
+    
+    # 1. Bake ARKit Keys
+    baked_count = 0
+    for arkit_name, facs_list in config.ARKIT_BAKING_MAP.items():
+        if arkit_name in existing_kbs:
+            continue # Already exists
+            
+        has_any = any(facs_name in existing_kbs for facs_name in facs_list)
+        if not has_any:
+            continue
+            
+        new_kb = obj.shape_key_add(name=arkit_name, from_mix=False)
+        blended_co = np.copy(basis_co)
+        
+        for facs_name in facs_list:
+            if facs_name in existing_kbs:
+                source_kb = existing_kbs[facs_name]
+                source_co = np.zeros(v_count * 3, dtype=np.float32)
+                source_kb.data.foreach_get("co", source_co)
+                # FACS fragments are additive
+                blended_co += (source_co - basis_co)
+                
+        new_kb.data.foreach_set("co", blended_co)
+        baked_count += 1
+        
+    # 2. Prune all non-ARKit keys (except Basis)
+    deleted_count = 0
+    blocks = obj.data.shape_keys.key_blocks
+    for i in range(len(blocks)-1, 0, -1):
+        kb = blocks[i]
+        if kb.name not in config.ARKIT_BAKING_MAP:
+            obj.shape_key_remove(kb)
+            deleted_count += 1
+            
+    return baked_count, deleted_count
+
+def clean_body_shape_keys(obj):
+    """Strips Daz prefixes from body JCMs."""
+    if not obj.data.shape_keys:
+        return 0
+        
+    renamed = 0
+    for kb in obj.data.shape_keys.key_blocks:
+        old_name = kb.name
+        if kb.name.startswith("body_bs_"):
+            kb.name = kb.name.replace("body_bs_", "")
+        elif kb.name.startswith("body_cbs_"):
+            kb.name = kb.name.replace("body_cbs_", "")
+            
+        if old_name != kb.name:
+            renamed += 1
+            
+    return renamed
+
 class MASTERSK_OT_split_meshes(bpy.types.Operator):
     """Step 7: Separate the character mesh and rig into Head and Body components"""
     bl_idname = "mastersk.split_meshes"
@@ -185,10 +254,15 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         clean_vertex_groups(body_obj, body_arm)
 
         # ---------------------------------------------------------------------
-        # 7. CLEAN EMPTY SHAPE KEYS
+        # 7. CLEAN AND BAKE SHAPE KEYS
         # ---------------------------------------------------------------------
-        head_sk_rm = clean_empty_shape_keys(head_obj)
-        body_sk_rm = clean_empty_shape_keys(body_obj)
+        # Empty cleaner ensures body JCMs are purged from head, and FACS from body
+        clean_empty_shape_keys(head_obj)
+        clean_empty_shape_keys(body_obj)
+        
+        # Bake ARKit for Head, Rename JCMs for Body
+        baked, deleted = bake_arkit_shape_keys(head_obj)
+        renamed = clean_body_shape_keys(body_obj)
 
         # Update scene variables
         scene.mastersk_mesh_obj = body_obj
@@ -196,6 +270,6 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         scene.mastersk_head_mesh = head_obj
         scene.mastersk_daz_armature = body_arm
 
-        self.report({'INFO'}, f"Step 7 Complete: Split meshes. Pruned SKs (Head: {head_sk_rm}, Body: {body_sk_rm})")
+        self.report({'INFO'}, f"Step 7 Complete: Baked {baked} ARKit keys, Purged {deleted} FACS keys, Renamed {renamed} JCMs.")
         scene.mastersk_progress_step = 8
         return {'FINISHED'}

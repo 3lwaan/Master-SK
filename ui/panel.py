@@ -100,8 +100,20 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
 
         layout.separator(factor=0.8)
 
-        # 3. Pipeline Steps Box
+        # 3. Pre-Requisite Reminder
+        box_import = layout.box()
+        box_import.label(text="Pre-Requisite: Daz Import", icon='INFO')
+        col_import = box_import.column(align=True)
+        col_import.label(text="In Daz Importer, click 'Import Standard Morphs'")
+        col_import.label(text="Check: FACS, JCMs, Transfer To Face Meshes")
+        col_import.label(text="Uncheck: FACS Details")
+        box_import.prop(scene, "mastersk_morphs_imported", text="I have imported the target morphs")
+
+        layout.separator(factor=0.8)
+
+        # 4. Pipeline Steps Box
         box_steps = layout.box()
+        box_steps.enabled = scene.mastersk_morphs_imported
         box_steps.label(text="Pipeline Steps:", icon='MOD_ARMATURE')
         
         # Draw Visual Progress Bar
@@ -169,6 +181,16 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         r = col.row()
         r.enabled = (step_val == 8)
         r.operator("mastersk.finalize_rigs", text="8. Finalize & Dual Rig Setup", icon='CHECKMARK')
+
+        # 5. Post-Processing Reminder
+        layout.separator(factor=1.0)
+        box_post = layout.box()
+        box_post.label(text="Pre-Export Checklist:", icon='ERROR')
+        col_post = box_post.column(align=True)
+        col_post.label(text="1. Manually align spine_01, 02, 03 to match weight paint.")
+        col_post.label(text="2. Smooth crotch weights for pelvis and thigh_twist_01_l/r.")
+        col_post.label(text="3. Verify armatures are named exactly 'root' (Object & Data).")
+        col_post.label(text="4. Verify meshes are 'Char_Head_Mesh' / 'Char_Body_Mesh'.")
 
         layout.separator(factor=1.0)
         row_reset = layout.row()

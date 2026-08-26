@@ -94,6 +94,31 @@ def rename_vertex_groups(mesh_obj, mapping):
             
     return renamed_count
 
+def rename_dynamic_vertex_groups(mesh_obj):
+    """
+    Catches any remaining vertex groups with 'l_' or 'r_' prefixes (like facial groups)
+    and converts them to Unreal Engine '_l' / '_r' suffixes.
+    """
+    if not mesh_obj or mesh_obj.type != 'MESH':
+        return 0
+
+    renamed_count = 0
+    vgroups = mesh_obj.vertex_groups
+
+    for vg in vgroups:
+        if vg.name.startswith("l_"):
+            new_name = vg.name[2:] + "_l"
+            if not vgroups.get(new_name):
+                vg.name = new_name
+                renamed_count += 1
+        elif vg.name.startswith("r_"):
+            new_name = vg.name[2:] + "_r"
+            if not vgroups.get(new_name):
+                vg.name = new_name
+                renamed_count += 1
+
+    return renamed_count
+
 def prune_unweighted_groups(mesh_obj, threshold=0.0001):
     """Removes vertex groups that have no influence."""
     if mesh_obj.type != 'MESH':

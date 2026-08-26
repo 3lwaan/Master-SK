@@ -86,6 +86,12 @@ def register():
         max=9
     )
 
+    bpy.types.Scene.mastersk_morphs_imported = bpy.props.BoolProperty(
+        name="Morphs Imported",
+        description="Confirm that standard morphs were imported",
+        default=False
+    )
+
     for cls in classes:
         bpy.utils.register_class(cls)
 
@@ -93,6 +99,7 @@ def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
+    del bpy.types.Scene.mastersk_morphs_imported
     del bpy.types.Scene.mastersk_head_mesh
     del bpy.types.Scene.mastersk_body_mesh
     del bpy.types.Scene.mastersk_als_armature

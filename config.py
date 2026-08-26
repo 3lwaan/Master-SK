@@ -248,3 +248,63 @@ BASE_TORSO_BONES = [
     "upperarm_l", "upperarm_twist_01_l",
     "upperarm_r", "upperarm_twist_01_r"
 ]
+
+# ---------------------------------------------------------------------------
+# MasterSK FACS-to-ARKit Baking Map (Step 7)
+# Maps the 52 standard Apple ARKit shape keys to their Daz FACS constituents.
+# Missing components are ignored dynamically if not present on the mesh.
+# ---------------------------------------------------------------------------
+ARKIT_BAKING_MAP = {
+    "EyeBlinkLeft": ["facs_bs_EyeBlinkLeft"],
+    "EyeLookDownLeft": ["facs_bs_EyeLookDownLeft"],
+    "EyeLookInLeft": ["facs_bs_EyeLookInLeft"],
+    "EyeLookOutLeft": ["facs_bs_EyeLookOutLeft"],
+    "EyeLookUpLeft": ["facs_bs_EyeLookUpLeft"],
+    "EyeSquintLeft": ["facs_bs_EyeSquintLeft"],
+    "EyeWideLeft": ["facs_bs_EyelidOpenUpperLeft", "facs_bs_EyelidOpenLowerLeft"],
+    "EyeBlinkRight": ["facs_bs_EyeBlinkRight"],
+    "EyeLookDownRight": ["facs_bs_EyeLookDownRight"],
+    "EyeLookInRight": ["facs_bs_EyeLookInRight"],
+    "EyeLookOutRight": ["facs_bs_EyeLookOutRight"],
+    "EyeLookUpRight": ["facs_bs_EyeLookUpRight"],
+    "EyeSquintRight": ["facs_bs_EyeSquintRight"],
+    "EyeWideRight": ["facs_bs_EyelidOpenUpperRight", "facs_bs_EyelidOpenLowerRight"],
+    "JawForward": ["facs_bs_JawChinCompression"], # Approximation or explicit if it exists
+    "JawRight": ["facs_bs_JawRight"],
+    "JawLeft": ["facs_bs_JawLeft"],
+    "JawOpen": ["facs_bs_JawOpen"],
+    "MouthClose": ["facs_bs_MouthCloseLowerLeft", "facs_bs_MouthCloseLowerRight", "facs_bs_MouthCloseUpperLeft", "facs_bs_MouthCloseUpperRight"],
+    "MouthFunnel": ["facs_bs_MouthFunnelLowerLeft", "facs_bs_MouthFunnelLowerRight", "facs_bs_MouthFunnelUpperLeft", "facs_bs_MouthFunnelUpperRight"],
+    "MouthPucker": ["facs_bs_MouthPurseLowerLeft", "facs_bs_MouthPurseLowerRight", "facs_bs_MouthPurseUpperLeft", "facs_bs_MouthPurseUpperRight"],
+    "MouthLeft": ["facs_bs_MouthLeft"],
+    "MouthRight": ["facs_bs_MouthRight"],
+    "MouthSmileLeft": ["facs_bs_MouthSmileLeft"],
+    "MouthSmileRight": ["facs_bs_MouthSmileRight"],
+    "MouthFrownLeft": ["facs_bs_MouthFrownLeft"],
+    "MouthFrownRight": ["facs_bs_MouthFrownRight"],
+    "MouthDimpleLeft": ["facs_bs_MouthDimpleLeft"],
+    "MouthDimpleRight": ["facs_bs_MouthDimpleRight"],
+    "MouthStretchLeft": ["facs_bs_MouthStretchLeft"],
+    "MouthStretchRight": ["facs_bs_MouthStretchRight"],
+    "MouthRollLower": ["facs_bs_MouthRollLowerLeft", "facs_bs_MouthRollLowerRight"],
+    "MouthRollUpper": ["facs_bs_MouthRollUpperLeft", "facs_bs_MouthRollUpperRight"],
+    "MouthShrugLower": ["facs_bs_MouthShrugLowerLeft", "facs_bs_MouthShrugLowerRight"],
+    "MouthShrugUpper": ["facs_bs_MouthShrugUpperLeft", "facs_bs_MouthShrugUpperRight"],
+    "MouthPressLeft": ["facs_bs_MouthPressLowerLeft", "facs_bs_MouthPressUpperLeft"],
+    "MouthPressRight": ["facs_bs_MouthPressLowerRight", "facs_bs_MouthPressUpperRight"],
+    "MouthLowerDownLeft": ["facs_bs_MouthLowerDownLeft"],
+    "MouthLowerDownRight": ["facs_bs_MouthLowerDownRight"],
+    "MouthUpperUpLeft": ["facs_bs_MouthUpperUpLeft"],
+    "MouthUpperUpRight": ["facs_bs_MouthUpperUpRight"],
+    "BrowDownLeft": ["facs_BrowDownLeft"],
+    "BrowDownRight": ["facs_BrowDownRight"],
+    "BrowInnerUp": ["facs_bs_BrowInnerUpLeft", "facs_bs_BrowInnerUpRight"],
+    "BrowOuterUpLeft": ["facs_BrowOuterUpLeft"],
+    "BrowOuterUpRight": ["facs_BrowOuterUpRight"],
+    "CheekPuff": ["facs_bs_CheekPuffLeft", "facs_bs_CheekPuffRight"],
+    "CheekSquintLeft": ["facs_bs_CheekSquintLeft"],
+    "CheekSquintRight": ["facs_bs_CheekSquintRight"],
+    "NoseSneerLeft": ["facs_bs_NoseSneerLeft"],
+    "NoseSneerRight": ["facs_bs_NoseSneerRight"],
+    "TongueOut": ["facs_bs_TongueOut"]
+}
