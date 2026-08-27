@@ -1,10 +1,12 @@
 import bpy
 import math
 import mathutils
+import os
+import json
 from .. import config
 
 class MASTERSK_OT_generate_rom(bpy.types.Operator):
-    """Generate a ROM (Range of Motion) animation for Pose Assets using World Matrices and Quaternions"""
+    """Generate a ROM animation using Full Native Daz Matrix/ShapeKey Extraction"""
     bl_idname = "mastersk.generate_rom"
     bl_label = "Step 9: Generate JCM ROM"
     bl_options = {'REGISTER', 'UNDO'}
@@ -12,7 +14,10 @@ class MASTERSK_OT_generate_rom(bpy.types.Operator):
     def execute(self, context):
         scene = context.scene
         als_arm = scene.mastersk_als_armature
-        
+        mesh_obj = scene.mastersk_body_mesh
+        if not mesh_obj:
+            mesh_obj = scene.mastersk_mesh_obj
+            
         daz_arm = None
         data_col = bpy.data.collections.get("MasterSK_Data")
         if data_col:
@@ -21,9 +26,18 @@ class MASTERSK_OT_generate_rom(bpy.types.Operator):
                     daz_arm = obj
                     break
 
-        if not als_arm or not daz_arm:
-            self.report({'ERROR'}, "Could not find ALS rig or hidden Daz rig. Ensure Step 8 was completed.")
+        if not als_arm or not daz_arm or not mesh_obj:
+            self.report({'ERROR'}, "Could not find ALS rig, Daz rig, or Mesh. Ensure Step 8 was completed.")
             return {'CANCELLED'}
+            
+        # Load daz_rom_full.json
+        json_path = os.path.join(os.path.dirname(__file__), "..", "data", "daz_rom_full.json")
+        if not os.path.exists(json_path):
+            self.report({'ERROR'}, "daz_rom_full.json not found in addon data folder!")
+            return {'CANCELLED'}
+            
+        with open(json_path, 'r') as f:
+            rom_frames = json.load(f)
 
         # Ensure object mode
         if context.object and context.object.mode != 'OBJECT':
@@ -39,6 +53,17 @@ class MASTERSK_OT_generate_rom(bpy.types.Operator):
         action = bpy.data.actions.new(name=action_name)
         als_arm.animation_data.action = action
 
+        # Create or clear action for Mesh (Shape Keys)
+        if mesh_obj.data.shape_keys:
+            if not mesh_obj.data.shape_keys.animation_data:
+                mesh_obj.data.shape_keys.animation_data_create()
+            sk_action_name = "MasterSK_JCM_ROM_Mesh"
+            sk_action = bpy.data.actions.get(sk_action_name)
+            if sk_action:
+                bpy.data.actions.remove(sk_action)
+            sk_action = bpy.data.actions.new(name=sk_action_name)
+            mesh_obj.data.shape_keys.animation_data.action = sk_action
+
         # Use QUATERNION for ALS to prevent Euler Gimbal Lock spinning
         for pb in als_arm.pose.bones:
             pb.rotation_mode = 'QUATERNION'
@@ -49,94 +74,134 @@ class MASTERSK_OT_generate_rom(bpy.types.Operator):
 
         self.clear_pose(als_arm)
         self.clear_pose(daz_arm)
+        if mesh_obj.data.shape_keys:
+            self.clear_shape_keys(mesh_obj)
         
         frame = 1
         
         # Keyframe Basis (Frame 1)
         self.keyframe_all_rotations(als_arm, frame)
+        if mesh_obj.data.shape_keys:
+            self.keyframe_all_shape_keys(mesh_obj, frame)
         frame += 1
 
         dg = context.evaluated_depsgraph_get()
 
-        # Iterate through JCM Map and create poses
-        for jcm_key, jcm_data in config.JCM_AAA_NAMING_MAP.items():
-            daz_bone_name = jcm_data.get("daz_bone")
-            
-            # Skip if bone is None
-            if daz_bone_name == "None" or not daz_bone_name:
-                continue
-                
-            daz_pb = daz_arm.pose.bones.get(daz_bone_name)
-            als_pb = als_arm.pose.bones.get(daz_bone_name)
-            
-            if not daz_pb or not als_pb:
-                print(f"MasterSK ROM: Bone {daz_bone_name} not found for {jcm_key}")
-                continue
-                
+        # Iterate through Native Daz Frame Clusters
+        for frame_key, frame_data in rom_frames.items():
             # Clear previous poses
             self.clear_pose(daz_arm)
             self.clear_pose(als_arm)
+            if mesh_obj.data.shape_keys:
+                self.clear_shape_keys(mesh_obj)
+                
+            active_sks = {}
+            valid_frame = False
             
-            # 1. Get Daz Rest Matrix (3x3 Rotation)
-            daz_rest_rot = daz_pb.bone.matrix_local.to_3x3()
+            # Parse Shape Keys for this frame
+            for sk_data in frame_data.get("shape_keys", []):
+                sk_name = sk_data["name"]
+                sk_value = sk_data["value"]
+                
+                # Strip prefixes to match config keys (body_bs_FlexHamstringL -> FlexHamstringL)
+                search_key = sk_name.replace("body_cbs_", "").replace("body_bs_", "")
+                
+                # Check if it exists in our mapping
+                if search_key in config.JCM_AAA_NAMING_MAP:
+                    jcm_data = config.JCM_AAA_NAMING_MAP[search_key]
+                    
+                    # Verify shape key actually exists on the mesh
+                    if mesh_obj.data.shape_keys:
+                        if jcm_data["new_name"] in mesh_obj.data.shape_keys.key_blocks:
+                            active_sks[jcm_data["new_name"]] = sk_value
+                            valid_frame = True
             
-            # Apply Daz native local rotations
-            rotations = jcm_data.get("rotations", {})
-            x_rot = math.radians(rotations.get("X", 0))
-            y_rot = math.radians(rotations.get("Y", 0))
-            z_rot = math.radians(rotations.get("Z", 0))
-            daz_pb.rotation_euler = (x_rot, y_rot, z_rot)
-            
-            # Update Depsgraph so Blender calculates the new world matrix for the Daz bone
-            dg.update()
-            
-            # 2. Get Daz Posed Matrix (3x3 Rotation)
-            daz_posed_rot = daz_pb.matrix.to_3x3()
-            
-            # 3. Calculate Delta Rotation in World Space
-            # R_delta = R_posed @ R_rest_inverted
-            daz_rest_inv = daz_rest_rot.copy()
-            daz_rest_inv.invert()
-            delta_rot = daz_posed_rot @ daz_rest_inv
-            
-            # 4. Apply Delta Rotation to ALS Rest Matrix
-            als_rest_rot = als_pb.bone.matrix_local.to_3x3()
-            als_posed_rot = delta_rot @ als_rest_rot
-            
-            # 5. Build full 4x4 Matrix for ALS
-            als_posed_mat = als_posed_rot.to_4x4()
-            als_posed_mat.translation = als_pb.matrix.translation
-            
-            # Set the pose Matrix
-            als_pb.matrix = als_posed_mat
-            
-            # MATHEMATICALLY PERFECT FIX 2: 
-            # Force shortest path interpolation to prevent Euler spinning
-            q = als_pb.rotation_quaternion.copy()
-            if q.w < 0:
-                q.negate()
-            als_pb.rotation_quaternion = q
-            
-            # Insert keyframe for the ALS bone
-            als_pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
-            
-            # Keyframe all other ALS bones at rest pose to prevent interpolation
-            for other_pb in als_arm.pose.bones:
-                if other_pb.name != daz_bone_name:
-                    other_pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+            # If no valid shape keys mapped for this cluster, we could skip it to save frames,
+            # BUT wait: some frames might be used for bone movement testing without shape keys?
+            # Actually, we want a compact ROM, so skipping frames that trigger NO valid shape keys is good.
+            if not valid_frame:
+                continue
+
+            # Now parse and rotate all bones involved in this cluster
+            for original_bone_name, rot in frame_data.get("bones", {}).items():
+                # Daz bone in the JSON is the original name (e.g. l_shin). 
+                # We must translate it to the new name (e.g. calf_l) using Step 3 map.
+                mapped_bone_name = config.BONE_NAME_MAPPING.get(original_bone_name, original_bone_name)
+                
+                daz_pb = daz_arm.pose.bones.get(mapped_bone_name)
+                als_pb = als_arm.pose.bones.get(mapped_bone_name)
+                
+                # If bone is not mapped to ALS, or was deleted in Step 2, skip it
+                if not daz_pb or not als_pb:
+                    continue
+                    
+                # 1. Get Daz Rest Matrix
+                daz_rest_rot = daz_pb.bone.matrix_local.to_3x3()
+                
+                # Apply EXACT Extracted Rotations from the JSON
+                x_rot = math.radians(rot["X"])
+                y_rot = math.radians(rot["Y"])
+                z_rot = math.radians(rot["Z"])
+                daz_pb.rotation_euler = (x_rot, y_rot, z_rot)
+                
+                # Update Depsgraph
+                dg.update()
+                
+                # 2. Get Daz Posed Matrix
+                daz_posed_rot = daz_pb.matrix.to_3x3()
+                
+                # 3. Calculate Delta Rotation in World Space
+                daz_rest_inv = daz_rest_rot.copy()
+                daz_rest_inv.invert()
+                delta_rot = daz_posed_rot @ daz_rest_inv
+                
+                # 4. Apply Delta Rotation to ALS Rest Matrix
+                als_rest_rot = als_pb.bone.matrix_local.to_3x3()
+                als_posed_rot = delta_rot @ als_rest_rot
+                
+                # 5. Build full 4x4 Matrix for ALS
+                als_posed_mat = als_posed_rot.to_4x4()
+                als_posed_mat.translation = als_pb.matrix.translation
+                
+                # Set the pose Matrix
+                als_pb.matrix = als_posed_mat
+                
+                # Force shortest path interpolation
+                q = als_pb.rotation_quaternion.copy()
+                if q.w < 0:
+                    q.negate()
+                als_pb.rotation_quaternion = q
+                
+            # Insert keyframe for ALL ALS bones
+            self.keyframe_all_rotations(als_arm, frame)
+                    
+            # Set shape keys to exact extracted values and keyframe it, others at 0.0
+            if mesh_obj.data.shape_keys:
+                for kb in mesh_obj.data.shape_keys.key_blocks:
+                    if kb.name == "Basis": continue
+                    if kb.name in active_sks:
+                        kb.value = active_sks[kb.name]
+                    else:
+                        kb.value = 0.0
+                    kb.keyframe_insert(data_path="value", frame=frame)
                     
             frame += 1
             
         # Reset to basis at end
         self.clear_pose(als_arm)
         self.clear_pose(daz_arm)
+        if mesh_obj.data.shape_keys:
+            self.clear_shape_keys(mesh_obj)
+            
         self.keyframe_all_rotations(als_arm, frame)
+        if mesh_obj.data.shape_keys:
+            self.keyframe_all_shape_keys(mesh_obj, frame)
 
         # Set timeline range
         scene.frame_start = 1
         scene.frame_end = frame
 
-        self.report({'INFO'}, f"Generated {frame-1}-frame ROM Animation (Quaternion Corrected): {action_name}")
+        self.report({'INFO'}, f"Generated {frame}-frame ROM Animation matching Native Daz Clusters & Rotations!")
         return {'FINISHED'}
 
     def clear_pose(self, arm_obj):
@@ -149,3 +214,12 @@ class MASTERSK_OT_generate_rom(bpy.types.Operator):
                 pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
             else:
                 pb.keyframe_insert(data_path="rotation_euler", frame=frame)
+
+    def clear_shape_keys(self, mesh_obj):
+        for kb in mesh_obj.data.shape_keys.key_blocks:
+            kb.value = 0.0
+
+    def keyframe_all_shape_keys(self, mesh_obj, frame):
+        for kb in mesh_obj.data.shape_keys.key_blocks:
+            kb.keyframe_insert(data_path="value", frame=frame)
+

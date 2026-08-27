@@ -5,6 +5,14 @@ All notable changes to the MasterSK addon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-08-27
+
+### Added
+- **Native Daz ROM Cloning (Step 9):** Integrated the native Daz Studio ROM extraction dictionary (`daz_rom_full.json`). The addon now flawlessly clones the original mathematical frame clusters and matrix rotations, allowing 1-to-1 JCM/ROM extraction for Unreal Engine.
+- **Automated Neck Flex Cleanup:** Added smart substring deletion in Step 7 to automatically hunt down and delete useless `NeckFlex` shape keys from the body mesh regardless of import prefix.
+- **Shape Key Intensity Multiplier:** Integrated a 2.0x permanent mathematical vertex coordinate multiplier into Step 7 to guarantee all body shape keys hit extreme deformation while maintaining a clean UI slider maximum.
+- **Symmetrical Slider Range:** Forced all body shape key slider minimums to `-1.0` during Step 7 cleanup to allow for inverse extreme deformations inside Unreal Engine.
+
 ## [3.1.0] - 2026-08-25
 
 ### Added

@@ -119,6 +119,33 @@ def clean_body_shape_keys(body_obj):
     if body_obj.data.shape_keys.animation_data:
         body_obj.data.shape_keys.animation_data_clear()
 
+    # Explicitly delete neck flexes from body mesh
+    keys_to_delete = []
+    for sk in body_obj.data.shape_keys.key_blocks:
+        if "NeckFlex" in sk.name or "FlexNeck" in sk.name:
+            keys_to_delete.append(sk)
+            
+    for sk in keys_to_delete:
+        body_obj.shape_key_remove(sk)
+
+    # Apply x2 multiplier and -1 range
+    basis = body_obj.data.shape_keys.key_blocks.get("Basis")
+    if not basis:
+        basis = body_obj.data.shape_keys.key_blocks[0]
+        
+    basis_co = [v.co.copy() for v in basis.data]
+    
+    for sk in body_obj.data.shape_keys.key_blocks:
+        if sk == basis:
+            continue
+            
+        sk.slider_min = -1.0
+            
+        # Multiply vertex coordinates by 2.0
+        for i in range(len(sk.data)):
+            delta = sk.data[i].co - basis_co[i]
+            sk.data[i].co = basis_co[i] + (delta * 2.0)
+
     cleaned_count = 0
     for sk in body_obj.data.shape_keys.key_blocks:
         if sk.name == "Basis":
@@ -303,4 +330,7 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         self.report({'INFO'}, f"Step 7 Complete: Baked {baked} ARKit keys, Purged {deleted} FACS keys, Renamed {renamed} JCMs.")
         scene.mastersk_progress_step = 8
         return {'FINISHED'}
+
+
+
 
