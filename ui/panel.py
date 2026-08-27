@@ -183,7 +183,6 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         # Step 9: Generate ROM Animation (Optional)
         r = col.row()
         r.enabled = (step_val >= 8) # Can run after 8
-        r.operator("mastersk.generate_rom", text="9. Generate JCM ROM (Optional)", icon='ACTION')
 
         # 5. Post-Processing Reminder
         layout.separator(factor=1.0)

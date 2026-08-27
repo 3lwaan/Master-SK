@@ -21,7 +21,6 @@ from .operators.op_split_meshes import MASTERSK_OT_split_meshes
 from .operators.op_append_skeleton import MASTERSK_OT_append_skeleton
 from .operators.op_snap_joints import MASTERSK_OT_snap_joints
 from .operators.op_finalize_rigs import MASTERSK_OT_finalize_rigs, MASTERSK_OT_spine_warning_popup
-from .operators.op_generate_rom import MASTERSK_OT_generate_rom
 from .ui.panel import MASTERSK_OT_auto_detect, MASTERSK_OT_reset_progress, MASTERSK_PT_main_panel
 
 classes = (
@@ -35,7 +34,6 @@ classes = (
     MASTERSK_OT_snap_joints,
     MASTERSK_OT_finalize_rigs,
     MASTERSK_OT_spine_warning_popup,
-    MASTERSK_OT_generate_rom,
     MASTERSK_OT_reset_progress,
     MASTERSK_PT_main_panel,
 )
