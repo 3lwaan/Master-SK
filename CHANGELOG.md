@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Pivoted to Bone Driven Controller Workflow:** Removed the Step 9 JCM ROM generator entirely. The pipeline is now fully optimized for Unreal Engine's real-time Post Process AnimBP using Bone Driven Controllers, eliminating the need for baked ROM animations and providing maximum real-time control over shape key deformations.
+- **Comprehensive Shape Key Optimization:** Completely refactored the configuration mappings to ensure perfectly symmetrical, collision-free, AAA-standard body shape key naming.
+- **Intelligent Number Stripping & Resolution:** Removed all arbitrary angle numbers from shape key names (e.g., `FootPitchDown45` -> `FootPitchDown`). Automatically resolved inherent naming collisions via smart anatomical substitutions (e.g., Spine1/2/3 translated to `Lower/Mid/Upper`, and identical angles mapped to `Half/Full`).
+- **Targeted Useless Key Eradication:** Added explicit deep-level deletion mappings for over 14 completely redundant or useless Daz shape keys (including extraneous Yaws, secondary bends, and Foot Pitch Up keys), optimizing the active key count to exactly 54 critical muscle drivers.
 
 ## [3.2.0] - 2026-08-27
 

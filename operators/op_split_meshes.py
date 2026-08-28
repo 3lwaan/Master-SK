@@ -167,7 +167,13 @@ def clean_body_shape_keys(body_obj):
             lookup_name = lookup_name.replace("body_cbs_", "")
             
         if lookup_name in config.JCM_AAA_NAMING_MAP:
-            sk.name = config.JCM_AAA_NAMING_MAP[lookup_name]["new_name"]
+            new_sk_name = config.JCM_AAA_NAMING_MAP[lookup_name]["new_name"]
+            if new_sk_name == "DELETE_ME":
+                # Do not rename, just mark for deletion later, or delete right now?
+                # We can't delete while iterating. Mark original name for deletion!
+                pass # it will just keep its original name and we delete it in the next loop
+            else:
+                sk.name = new_sk_name
             cleaned_count += 1
         else:
             # Fallback just strip prefixes if somehow missed
@@ -177,6 +183,28 @@ def clean_body_shape_keys(body_obj):
             elif original_name.startswith("body_cbs_"):
                 sk.name = original_name.replace("body_cbs_", "")
                 cleaned_count += 1
+
+    keys_to_delete_final = []
+    for sk in body_obj.data.shape_keys.key_blocks:
+        # Check if this shape key maps to DELETE_ME in config!
+        original_name = sk.name
+        lookup_name = original_name
+        if lookup_name.startswith("body_bs_"):
+            lookup_name = lookup_name.replace("body_bs_", "")
+        elif lookup_name.startswith("body_cbs_"):
+            lookup_name = lookup_name.replace("body_cbs_", "")
+            
+        if lookup_name in config.JCM_AAA_NAMING_MAP:
+            if config.JCM_AAA_NAMING_MAP[lookup_name]["new_name"] == "DELETE_ME":
+                keys_to_delete_final.append(sk)
+                continue
+                
+        # Also check for exact string DELETE_ME just in case
+        if "DELETE_ME" in sk.name:
+            keys_to_delete_final.append(sk)
+            
+    for sk in keys_to_delete_final:
+        body_obj.shape_key_remove(sk)
 
     return cleaned_count
 
