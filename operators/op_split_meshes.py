@@ -349,6 +349,152 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
         # Rename JCMs for Body
         renamed = clean_body_shape_keys(body_obj)
 
+        # ---------------------------------------------------------------------
+        # 8. MOUTH MESH INTEGRATION
+        # ---------------------------------------------------------------------
+        mouth_obj = scene.mastersk_mouth_mesh
+        if mouth_obj and mouth_obj.type == 'MESH':
+            # Bulletproof visibility and view layer injection
+            if mouth_obj.name not in context.view_layer.objects:
+                try:
+                    context.collection.objects.link(mouth_obj)
+                except RuntimeError:
+                    pass # Already linked to a collection, but excluded from view layer.
+                    
+            try:
+                context.view_layer.active_layer_collection.collection.objects.link(mouth_obj)
+            except:
+                pass
+                
+            mouth_obj.hide_set(False)
+            mouth_obj.hide_viewport = False
+            
+            # Clear shape keys
+            if mouth_obj.data.shape_keys:
+                mouth_obj.shape_key_clear()
+                
+            # Merge materials ("Teeth" -> "Mouth")
+            mouth_mat_idx = -1
+            teeth_mat_idx = -1
+            
+            for i, slot in enumerate(mouth_obj.material_slots):
+                if slot.material:
+                    name_lower = slot.material.name.lower()
+                    if "mouth" in name_lower:
+                        mouth_mat_idx = i
+                    elif "teeth" in name_lower:
+                        teeth_mat_idx = i
+                        
+            if mouth_mat_idx != -1 and teeth_mat_idx != -1:
+                # Reassign polygons
+                for poly in mouth_obj.data.polygons:
+                    if poly.material_index == teeth_mat_idx:
+                        poly.material_index = mouth_mat_idx
+                
+                # Delete the teeth material slot
+                bpy.ops.object.select_all(action='DESELECT')
+                mouth_obj.select_set(True)
+                context.view_layer.objects.active = mouth_obj
+                mouth_obj.active_material_index = teeth_mat_idx
+                bpy.ops.object.material_slot_remove()
+
+            # Force all Mouth/Teeth UVs into the exact [1, 2] UDIM tile
+            if mouth_obj.data.uv_layers.active:
+                for loop in mouth_obj.data.loops:
+                    # Collapse any existing UDIM offsets to [0, 1], then explicitly shift to [1, 2]
+                    current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
+                    mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
+
+            # Force all Mouth/Teeth UVs into the exact [1, 2] UDIM tile
+            if mouth_obj.data.uv_layers.active:
+                for loop in mouth_obj.data.loops:
+                    # Collapse any existing UDIM offsets to [0, 1], then explicitly shift to [1, 2]
+                    current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
+                    mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
+
+            # Join Mouth into Head
+            head_obj.hide_set(False)
+            head_obj.hide_viewport = False
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            mouth_obj.select_set(True)
+            head_obj.select_set(True)
+            context.view_layer.objects.active = head_obj
+            bpy.ops.object.join()
+
+        # ---------------------------------------------------------------------
+        # 8. MOUTH MESH INTEGRATION
+        # ---------------------------------------------------------------------
+        mouth_obj = scene.mastersk_mouth_mesh
+        if mouth_obj and mouth_obj.type == 'MESH':
+            # Bulletproof visibility and view layer injection
+            if mouth_obj.name not in context.view_layer.objects:
+                try:
+                    context.collection.objects.link(mouth_obj)
+                except RuntimeError:
+                    pass # Already linked to a collection, but excluded from view layer.
+                    
+            try:
+                context.view_layer.active_layer_collection.collection.objects.link(mouth_obj)
+            except:
+                pass
+                
+            mouth_obj.hide_set(False)
+            mouth_obj.hide_viewport = False
+            
+            # Clear shape keys
+            if mouth_obj.data.shape_keys:
+                mouth_obj.shape_key_clear()
+                
+            # Merge materials ("Teeth" -> "Mouth")
+            mouth_mat_idx = -1
+            teeth_mat_idx = -1
+            
+            for i, slot in enumerate(mouth_obj.material_slots):
+                if slot.material:
+                    name_lower = slot.material.name.lower()
+                    if "mouth" in name_lower:
+                        mouth_mat_idx = i
+                    elif "teeth" in name_lower:
+                        teeth_mat_idx = i
+                        
+            if mouth_mat_idx != -1 and teeth_mat_idx != -1:
+                # Reassign polygons
+                for poly in mouth_obj.data.polygons:
+                    if poly.material_index == teeth_mat_idx:
+                        poly.material_index = mouth_mat_idx
+                
+                # Delete the teeth material slot
+                bpy.ops.object.select_all(action='DESELECT')
+                mouth_obj.select_set(True)
+                context.view_layer.objects.active = mouth_obj
+                mouth_obj.active_material_index = teeth_mat_idx
+                bpy.ops.object.material_slot_remove()
+
+            # Force all Mouth/Teeth UVs into the exact [1, 2] UDIM tile
+            if mouth_obj.data.uv_layers.active:
+                for loop in mouth_obj.data.loops:
+                    # Collapse any existing UDIM offsets to [0, 1], then explicitly shift to [1, 2]
+                    current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
+                    mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
+
+            # Force all Mouth/Teeth UVs into the exact [1, 2] UDIM tile
+            if mouth_obj.data.uv_layers.active:
+                for loop in mouth_obj.data.loops:
+                    # Collapse any existing UDIM offsets to [0, 1], then explicitly shift to [1, 2]
+                    current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
+                    mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
+
+            # Join Mouth into Head
+            head_obj.hide_set(False)
+            head_obj.hide_viewport = False
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            mouth_obj.select_set(True)
+            head_obj.select_set(True)
+            context.view_layer.objects.active = head_obj
+            bpy.ops.object.join()
+
         # Update scene variables
         scene.mastersk_mesh_obj = body_obj
         scene.mastersk_body_mesh = body_obj

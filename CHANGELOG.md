@@ -5,6 +5,14 @@ All notable changes to the MasterSK addon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [4.0.0] - 2026-08-28
+
+### Added
+- **Automated Mouth Mesh Integration:** Added a streamlined pipeline for perfectly integrating the Genesis 9 Mouth mesh. The addon now automatically detects the mesh, strips heavy subdivision modifiers, translates the Kinematic Pose Matching A-Pose offset (so the mouth tracks the jaw), purges all shape keys, merges the 'Teeth' material into the 'Mouth' slot, and finally joins the optimized geometry directly into the Head mesh.
+- **Mathematical UDIM Sequencing:** Upgraded the UV optimization logic in Step 7 to enforce a flawless, AAA-standard non-overlapping UDIM layout without requiring manual UV editing. The Mouth and Teeth UVs are wrapped and stacked into `[1, 2]`. The Body mesh is dynamically sequenced across three tiles based on material assignments (Torso at `[0,1]`, Legs at `[1,2]`, and Arms/Nails at `[2,3]`).
+
+
 ## [4.0.0] - 2026-08-27
 
 ### Changed

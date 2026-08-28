@@ -78,6 +78,18 @@ def register():
         poll=poll_mesh
     )
 
+    bpy.types.Scene.mastersk_mouth_mesh = bpy.props.PointerProperty(
+        type=bpy.types.Object,
+        name="G9 Mouth Mesh",
+        poll=poll_mesh
+    )
+
+    bpy.types.Scene.mastersk_mouth_mesh = bpy.props.PointerProperty(
+        type=bpy.types.Object,
+        name="G9 Mouth Mesh",
+        poll=poll_mesh
+    )
+
     bpy.types.Scene.mastersk_progress_step = bpy.props.IntProperty(
         name="Pipeline Progress",
         description="Current step in the MasterSK pipeline",
@@ -100,6 +112,8 @@ def unregister():
         bpy.utils.unregister_class(cls)
 
     del bpy.types.Scene.mastersk_morphs_imported
+    del bpy.types.Scene.mastersk_mouth_mesh
+    del bpy.types.Scene.mastersk_mouth_mesh
     del bpy.types.Scene.mastersk_head_mesh
     del bpy.types.Scene.mastersk_body_mesh
     del bpy.types.Scene.mastersk_als_armature

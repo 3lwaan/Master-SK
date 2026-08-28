@@ -25,13 +25,30 @@ class MASTERSK_OT_auto_detect(bpy.types.Operator):
             if not scene.mastersk_mesh_obj and obj.type == 'MESH':
                 if any(kw in obj.name.lower() for kw in ["genesis", "g9", "mesh", "lawrence", "body"]):
                     scene.mastersk_mesh_obj = obj
+            if not scene.mastersk_mouth_mesh and obj.type == 'MESH':
+                if any(kw in obj.name.lower() for kw in ["mouth", "teeth"]):
+                    scene.mastersk_mouth_mesh = obj
             if not scene.mastersk_daz_armature and obj.type == 'ARMATURE':
                 if not any(kw in obj.name.lower() for kw in ["als", "mannequin", "ue"]):
                     scene.mastersk_daz_armature = obj
 
+        # Strip subdivision modifiers and normalize UV maps
+        meshes_to_clean = [scene.mastersk_mesh_obj, scene.mastersk_mouth_mesh]
+        for m in meshes_to_clean:
+            if m and m.type == 'MESH':
+                # Strip Subsurf
+                for mod in m.modifiers:
+                    if mod.type == 'SUBSURF':
+                        m.modifiers.remove(mod)
+                # Rename UV maps to "UVmap" to prevent multiple channels upon joining
+                if m.data.uv_layers:
+                    for uv in m.data.uv_layers:
+                        uv.name = "UVmap" 
+
         # Apply scale on detected objects to prevent mesh deformation issues
         self._apply_scale(context, scene.mastersk_daz_armature)
         self._apply_scale(context, scene.mastersk_mesh_obj)
+        self._apply_scale(context, scene.mastersk_mouth_mesh)
 
         self.report({'INFO'}, "Genesis 9 character objects auto-detected (scale applied).")
         return {'FINISHED'}
@@ -92,7 +109,8 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         box_cfg.label(text="Genesis 9 Character", icon='OUTLINER_OB_ARMATURE')
 
         col_cfg = box_cfg.column(align=True)
-        col_cfg.prop_search(scene, "mastersk_mesh_obj", bpy.data, "objects", text="Mesh")
+        col_cfg.prop_search(scene, "mastersk_mesh_obj", bpy.data, "objects", text="Body Mesh")
+        col_cfg.prop_search(scene, "mastersk_mouth_mesh", bpy.data, "objects", text="Mouth Mesh")
         col_cfg.prop_search(scene, "mastersk_daz_armature", bpy.data, "objects", text="Armature")
 
         box_cfg.separator(factor=0.3)

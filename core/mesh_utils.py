@@ -168,3 +168,41 @@ def optimize_materials_and_uvs(mesh_obj):
                         
     # 4. Clean up the now-empty material slots (Mouth Cavity, Nails)
     clean_unused_material_slots(mesh_obj)
+
+    # 5. UDIM Sequencing for Body Mesh (Body: 0, Legs: +1, Arms: +2)
+    if uv_layer:
+        for poly in mesh.polygons:
+            mat_idx = poly.material_index
+            if mat_idx >= len(mesh_obj.material_slots) or not mesh_obj.material_slots[mat_idx].material:
+                continue
+                
+            mat_name = mesh_obj.material_slots[mat_idx].material.name.lower()
+            shift_x = 0.0
+            
+            if "leg" in mat_name:
+                shift_x = 1.0
+            elif "arm" in mat_name or "nail" in mat_name:
+                shift_x = 2.0
+                
+            for loop_idx in poly.loop_indices:
+                current_u = uv_layer.data[loop_idx].uv[0]
+                uv_layer.data[loop_idx].uv[0] = (current_u % 1.0) + shift_x
+
+    # 5. UDIM Sequencing for Body Mesh (Body: 0, Legs: +1, Arms: +2)
+    if uv_layer:
+        for poly in mesh.polygons:
+            mat_idx = poly.material_index
+            if mat_idx >= len(mesh_obj.material_slots) or not mesh_obj.material_slots[mat_idx].material:
+                continue
+                
+            mat_name = mesh_obj.material_slots[mat_idx].material.name.lower()
+            shift_x = 0.0
+            
+            if "leg" in mat_name:
+                shift_x = 1.0
+            elif "arm" in mat_name or "nail" in mat_name:
+                shift_x = 2.0
+                
+            for loop_idx in poly.loop_indices:
+                current_u = uv_layer.data[loop_idx].uv[0]
+                uv_layer.data[loop_idx].uv[0] = (current_u % 1.0) + shift_x
