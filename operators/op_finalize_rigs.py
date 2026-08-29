@@ -3,9 +3,9 @@ from .. import config
 from ..core import weight_utils
 
 class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
-    """Step 8: Construct ALS Body Skeleton and ALS Head/Face Skeleton, bind meshes, and organize collections"""
+    """Step 9: Construct ALS Body Skeleton and ALS Head/Face Skeleton, bind meshes, and organize collections"""
     bl_idname = "mastersk.finalize_rigs"
-    bl_label = "Step 8: Finalize & Dual Rig Setup"
+    bl_label = "Step 9: Finalize & Dual Rig Setup"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -115,7 +115,7 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
         # Trigger the popup warning for manual spine alignment
         bpy.ops.mastersk.spine_warning_popup('INVOKE_DEFAULT')
         
-        scene.mastersk_progress_step = 9
+        scene.mastersk_progress_step = 10
         return {'FINISHED'}
 
     def transfer_face_bones(self, daz_arm, head_arm):

@@ -1,7 +1,7 @@
 bl_info = {
     "name": "MasterSK - Genesis 9 to ALS Pipeline",
     "author": "Gate Studio / Antigravity",
-    "version": (4, 0, 0),
+    "version": (4, 1, 0),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > MasterSK Tab",
     "description": "Automated Daz Genesis 9 to ALS skeleton replacement, roll-locked joint snapping, and modular Body/Face dual-rig generation for Unreal Engine 5.",
@@ -20,6 +20,7 @@ from .operators.op_match_rest_pose import MASTERSK_OT_match_rest_pose
 from .operators.op_split_meshes import MASTERSK_OT_split_meshes
 from .operators.op_append_skeleton import MASTERSK_OT_append_skeleton
 from .operators.op_snap_joints import MASTERSK_OT_snap_joints
+from .operators.op_purge_and_join import MASTERSK_OT_purge_and_join
 from .operators.op_finalize_rigs import MASTERSK_OT_finalize_rigs, MASTERSK_OT_spine_warning_popup
 from .ui.panel import MASTERSK_OT_auto_detect, MASTERSK_OT_reset_progress, MASTERSK_PT_main_panel
 
@@ -30,6 +31,7 @@ classes = (
     MASTERSK_OT_map_vertex_groups,
     MASTERSK_OT_match_rest_pose,
     MASTERSK_OT_split_meshes,
+    MASTERSK_OT_purge_and_join,
     MASTERSK_OT_append_skeleton,
     MASTERSK_OT_snap_joints,
     MASTERSK_OT_finalize_rigs,
@@ -84,9 +86,33 @@ def register():
         poll=poll_mesh
     )
 
+    bpy.types.Scene.mastersk_eyes_mesh = bpy.props.PointerProperty(
+        type=bpy.types.Object,
+        name="G9 Eyes Mesh",
+        poll=poll_mesh
+    )
+
+    bpy.types.Scene.mastersk_eyes_mesh = bpy.props.PointerProperty(
+        type=bpy.types.Object,
+        name="G9 Eyes Mesh",
+        poll=poll_mesh
+    )
+
     bpy.types.Scene.mastersk_mouth_mesh = bpy.props.PointerProperty(
         type=bpy.types.Object,
         name="G9 Mouth Mesh",
+        poll=poll_mesh
+    )
+
+    bpy.types.Scene.mastersk_eyes_mesh = bpy.props.PointerProperty(
+        type=bpy.types.Object,
+        name="G9 Eyes Mesh",
+        poll=poll_mesh
+    )
+
+    bpy.types.Scene.mastersk_eyes_mesh = bpy.props.PointerProperty(
+        type=bpy.types.Object,
+        name="G9 Eyes Mesh",
         poll=poll_mesh
     )
 
@@ -113,6 +139,8 @@ def unregister():
 
     del bpy.types.Scene.mastersk_morphs_imported
     del bpy.types.Scene.mastersk_mouth_mesh
+    del bpy.types.Scene.mastersk_eyes_mesh
+    del bpy.types.Scene.mastersk_eyes_mesh
     del bpy.types.Scene.mastersk_mouth_mesh
     del bpy.types.Scene.mastersk_head_mesh
     del bpy.types.Scene.mastersk_body_mesh

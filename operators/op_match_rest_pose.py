@@ -75,11 +75,13 @@ class MASTERSK_OT_match_rest_pose(bpy.types.Operator):
 
         # 5. Bake the Armature Deformed Pose into the Mesh & All Shape Keys
         bone_math.fast_bake_armature_with_shapekeys(context, mesh_obj, arm_obj)
-        if scene.mastersk_mouth_mesh and scene.mastersk_mouth_mesh.type == 'MESH':
-            try:
-                bone_math.fast_bake_armature_with_shapekeys(context, scene.mastersk_mouth_mesh, arm_obj)
-            except Exception as e:
-                self.report({'WARNING'}, f"Could not bake rest pose to Mouth Mesh: {str(e)}")
+        
+        for extra_mesh in [scene.mastersk_mouth_mesh, scene.mastersk_eyes_mesh]:
+            if extra_mesh and extra_mesh.type == 'MESH':
+                try:
+                    bone_math.fast_bake_armature_with_shapekeys(context, extra_mesh, arm_obj)
+                except Exception as e:
+                    self.report({'WARNING'}, f"Could not bake rest pose to {extra_mesh.name}: {str(e)}")
 
         # 6. Apply Current Pose as Armature Rest Pose
         context.view_layer.objects.active = arm_obj
@@ -99,17 +101,12 @@ class MASTERSK_OT_match_rest_pose(bpy.types.Operator):
             new_mod = mesh_obj.modifiers.new(name="Armature", type='ARMATURE')
             new_mod.object = arm_obj
             
-        if scene.mastersk_mouth_mesh and scene.mastersk_mouth_mesh.type == 'MESH':
-            m_has_mod = any(m.type == 'ARMATURE' and m.object == arm_obj for m in scene.mastersk_mouth_mesh.modifiers)
-            if not m_has_mod:
-                m_new_mod = scene.mastersk_mouth_mesh.modifiers.new(name="Armature", type='ARMATURE')
-                m_new_mod.object = arm_obj
-            
-        if scene.mastersk_mouth_mesh and scene.mastersk_mouth_mesh.type == 'MESH':
-            m_has_mod = any(m.type == 'ARMATURE' and m.object == arm_obj for m in scene.mastersk_mouth_mesh.modifiers)
-            if not m_has_mod:
-                m_new_mod = scene.mastersk_mouth_mesh.modifiers.new(name="Armature", type='ARMATURE')
-                m_new_mod.object = arm_obj
+        for extra_mesh in [scene.mastersk_mouth_mesh, scene.mastersk_eyes_mesh]:
+            if extra_mesh and extra_mesh.type == 'MESH':
+                m_has_mod = any(m.type == 'ARMATURE' and m.object == arm_obj for m in extra_mesh.modifiers)
+                if not m_has_mod:
+                    m_new_mod = extra_mesh.modifiers.new(name="Armature", type='ARMATURE')
+                    m_new_mod.object = arm_obj
 
         self.report({'INFO'}, "Step 4 Complete: Kinematic matching solved. New ALS A-Pose baked as default rest pose.")
         scene.mastersk_progress_step = 5

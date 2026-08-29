@@ -139,7 +139,7 @@ def optimize_materials_and_uvs(mesh_obj):
             
     # 2. Load custom nail UV data
     uv_data = {}
-    json_path = os.path.join(os.path.dirname(__file__), "nail_uv_data.json")
+    json_path = os.path.join(os.path.dirname(__file__), "..", "data", "nail_uv_data.json")
     if os.path.exists(json_path):
         with open(json_path, 'r') as f:
             try:

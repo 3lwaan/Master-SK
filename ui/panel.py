@@ -28,12 +28,15 @@ class MASTERSK_OT_auto_detect(bpy.types.Operator):
             if not scene.mastersk_mouth_mesh and obj.type == 'MESH':
                 if any(kw in obj.name.lower() for kw in ["mouth", "teeth"]):
                     scene.mastersk_mouth_mesh = obj
+            if not scene.mastersk_eyes_mesh and obj.type == 'MESH':
+                if "eyes" in obj.name.lower():
+                    scene.mastersk_eyes_mesh = obj
             if not scene.mastersk_daz_armature and obj.type == 'ARMATURE':
                 if not any(kw in obj.name.lower() for kw in ["als", "mannequin", "ue"]):
                     scene.mastersk_daz_armature = obj
 
         # Strip subdivision modifiers and normalize UV maps
-        meshes_to_clean = [scene.mastersk_mesh_obj, scene.mastersk_mouth_mesh]
+        meshes_to_clean = [scene.mastersk_mesh_obj, scene.mastersk_mouth_mesh, scene.mastersk_eyes_mesh]
         for m in meshes_to_clean:
             if m and m.type == 'MESH':
                 # Strip Subsurf
@@ -49,6 +52,8 @@ class MASTERSK_OT_auto_detect(bpy.types.Operator):
         self._apply_scale(context, scene.mastersk_daz_armature)
         self._apply_scale(context, scene.mastersk_mesh_obj)
         self._apply_scale(context, scene.mastersk_mouth_mesh)
+        self._apply_scale(context, scene.mastersk_eyes_mesh)
+        self._apply_scale(context, scene.mastersk_eyes_mesh)
 
         self.report({'INFO'}, "Genesis 9 character objects auto-detected (scale applied).")
         return {'FINISHED'}
@@ -111,6 +116,7 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         col_cfg = box_cfg.column(align=True)
         col_cfg.prop_search(scene, "mastersk_mesh_obj", bpy.data, "objects", text="Body Mesh")
         col_cfg.prop_search(scene, "mastersk_mouth_mesh", bpy.data, "objects", text="Mouth Mesh")
+        col_cfg.prop_search(scene, "mastersk_eyes_mesh", bpy.data, "objects", text="Eyes Mesh")
         col_cfg.prop_search(scene, "mastersk_daz_armature", bpy.data, "objects", text="Armature")
 
         box_cfg.separator(factor=0.3)
@@ -134,7 +140,7 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         # Draw Visual Progress Bar
         step_val = scene.mastersk_progress_step
         row_prog = box_steps.row(align=True)
-        for i in range(1, 9):
+        for i in range(1, 10):
             if i < step_val:
                 row_prog.label(text="", icon='CHECKBOX_HLT')
             elif i == step_val:
@@ -142,7 +148,7 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
             else:
                 row_prog.label(text="", icon='CHECKBOX_DEHLT')
 
-        if step_val > 8:
+        if step_val > 9:
             box_steps.label(text="Pipeline Complete!", icon='FILE_TICK')
         
         box_steps.separator()
@@ -186,21 +192,26 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         r.operator("mastersk.snap_joints", text="6. Snap Joints & Lock Roll", icon='SNAP_ON')
         col.separator(factor=0.4)
 
-        # Step 7: Split Head & Body Meshes
+        # Step 7: Isolate & Optimize Geometry
         r = col.row()
         r.enabled = (step_val == 7)
-        r.operator("mastersk.split_meshes", text="7. Split Head & Body Meshes", icon='MOD_EXPLODE')
+        r.operator("mastersk.split_meshes", text="7. Isolate & Optimize Geometry", icon='MOD_EXPLODE')
         col.separator(factor=0.4)
 
-        # Step 8: Finalize & Dual Rig Setup
+        # Step 8: Shape Key Purge & Integration
         r = col.row()
         r.enabled = (step_val == 8)
-        r.operator("mastersk.finalize_rigs", text="8. Finalize & Dual Rig Setup", icon='CHECKMARK')
+        r.operator("mastersk.purge_and_join", text="8. Shape Key Purge & Integration", icon='MOD_SHRINKWRAP')
         col.separator(factor=0.4)
 
-        # Step 9: Generate ROM Animation (Optional)
+        # Step 9: Finalize & Dual Rig Setup
         r = col.row()
-        r.enabled = (step_val >= 8) # Can run after 8
+        r.enabled = (step_val == 9)
+        r.operator("mastersk.finalize_rigs", text="9. Finalize & Dual Rig Setup", icon='CHECKMARK')
+        col.separator(factor=0.4)
+
+        r = col.row()
+        r.enabled = (step_val >= 9)
 
         # 5. Post-Processing Reminder
         layout.separator(factor=1.0)

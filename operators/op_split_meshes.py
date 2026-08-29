@@ -332,179 +332,166 @@ class MASTERSK_OT_split_meshes(bpy.types.Operator):
                 mod.object = body_arm
 
         # ---------------------------------------------------------------------
-        # 6. CLEAN VERTEX GROUPS
-        # ---------------------------------------------------------------------
-        clean_vertex_groups(head_obj, head_arm)
-        clean_vertex_groups(body_obj, body_arm)
-
-        # ---------------------------------------------------------------------
-        # 7. CLEAN AND BAKE SHAPE KEYS
-        # ---------------------------------------------------------------------
-        # Bake ARKit for Head FIRST so controllers are evaluated!
-        baked, deleted = bake_arkit_shape_keys(head_obj)
-        
-        # Empty cleaner ensures body JCMs are purged from body, and empty ones are deleted
-        clean_empty_shape_keys(body_obj)
-        
-        # Rename JCMs for Body
-        renamed = clean_body_shape_keys(body_obj)
-
-        # ---------------------------------------------------------------------
-        # 8. MOUTH MESH INTEGRATION
+        # 6. MOUTH MESH PREPARATION (No joining)
         # ---------------------------------------------------------------------
         mouth_obj = scene.mastersk_mouth_mesh
         if mouth_obj and mouth_obj.type == 'MESH':
-            # Bulletproof visibility and view layer injection
             if mouth_obj.name not in context.view_layer.objects:
-                try:
-                    context.collection.objects.link(mouth_obj)
-                except RuntimeError:
-                    pass # Already linked to a collection, but excluded from view layer.
-                    
-            try:
-                context.view_layer.active_layer_collection.collection.objects.link(mouth_obj)
-            except:
-                pass
+                try: context.collection.objects.link(mouth_obj)
+                except: pass
+            try: context.view_layer.active_layer_collection.collection.objects.link(mouth_obj)
+            except: pass
                 
             mouth_obj.hide_set(False)
             mouth_obj.hide_viewport = False
             
-            # Clear shape keys
-            if mouth_obj.data.shape_keys:
-                mouth_obj.shape_key_clear()
-                
-            # Merge materials ("Teeth" -> "Mouth")
             mouth_mat_idx = -1
             teeth_mat_idx = -1
-            
             for i, slot in enumerate(mouth_obj.material_slots):
                 if slot.material:
                     name_lower = slot.material.name.lower()
-                    if "mouth" in name_lower:
-                        mouth_mat_idx = i
-                    elif "teeth" in name_lower:
-                        teeth_mat_idx = i
+                    if "mouth" in name_lower: mouth_mat_idx = i
+                    elif "teeth" in name_lower: teeth_mat_idx = i
                         
             if mouth_mat_idx != -1 and teeth_mat_idx != -1:
-                # Reassign polygons
                 for poly in mouth_obj.data.polygons:
                     if poly.material_index == teeth_mat_idx:
                         poly.material_index = mouth_mat_idx
                 
-                # Delete the teeth material slot
                 bpy.ops.object.select_all(action='DESELECT')
                 mouth_obj.select_set(True)
                 context.view_layer.objects.active = mouth_obj
                 mouth_obj.active_material_index = teeth_mat_idx
                 bpy.ops.object.material_slot_remove()
 
-            # Force all Mouth/Teeth UVs into the exact [1, 2] UDIM tile
             if mouth_obj.data.uv_layers.active:
                 for loop in mouth_obj.data.loops:
-                    # Collapse any existing UDIM offsets to [0, 1], then explicitly shift to [1, 2]
                     current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
                     mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
 
-            # Force all Mouth/Teeth UVs into the exact [1, 2] UDIM tile
-            if mouth_obj.data.uv_layers.active:
-                for loop in mouth_obj.data.loops:
-                    # Collapse any existing UDIM offsets to [0, 1], then explicitly shift to [1, 2]
-                    current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
-                    mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
-
-            # Join Mouth into Head
-            head_obj.hide_set(False)
-            head_obj.hide_viewport = False
+        # ---------------------------------------------------------------------
+        # 7. EYES MESH PREPARATION (No joining)
+        # ---------------------------------------------------------------------
+        eyes_obj = scene.mastersk_eyes_mesh
+        if eyes_obj and eyes_obj.type == 'MESH':
+            if eyes_obj.name not in context.view_layer.objects:
+                try: context.collection.objects.link(eyes_obj)
+                except: pass
+            try: context.view_layer.active_layer_collection.collection.objects.link(eyes_obj)
+            except: pass
+                
+            eyes_obj.hide_set(False)
+            eyes_obj.hide_viewport = False
             
-            bpy.ops.object.select_all(action='DESELECT')
-            mouth_obj.select_set(True)
-            head_obj.select_set(True)
-            context.view_layer.objects.active = head_obj
-            bpy.ops.object.join()
-
-        # ---------------------------------------------------------------------
-        # 8. MOUTH MESH INTEGRATION
-        # ---------------------------------------------------------------------
-        mouth_obj = scene.mastersk_mouth_mesh
-        if mouth_obj and mouth_obj.type == 'MESH':
-            # Bulletproof visibility and view layer injection
-            if mouth_obj.name not in context.view_layer.objects:
-                try:
-                    context.collection.objects.link(mouth_obj)
-                except RuntimeError:
-                    pass # Already linked to a collection, but excluded from view layer.
+            import os
+            import json
+            import bmesh
+            json_path = os.path.join(os.path.dirname(__file__), "..", "data", "eye_optimization_data.json")
+            if os.path.exists(json_path):
+                with open(json_path, 'r') as jf:
+                    opt_data = json.load(jf)
                     
-            try:
-                context.view_layer.active_layer_collection.collection.objects.link(mouth_obj)
-            except:
-                pass
+                context.view_layer.objects.active = eyes_obj
+                bpy.ops.object.mode_set(mode='EDIT')
+                bm = bmesh.from_edit_mesh(eyes_obj.data)
                 
-            mouth_obj.hide_set(False)
-            mouth_obj.hide_viewport = False
-            
-            # Clear shape keys
-            if mouth_obj.data.shape_keys:
-                mouth_obj.shape_key_clear()
+                bm.faces.ensure_lookup_table()
+                bm.verts.ensure_lookup_table()
+                bm.edges.ensure_lookup_table()
                 
-            # Merge materials ("Teeth" -> "Mouth")
-            mouth_mat_idx = -1
-            teeth_mat_idx = -1
+                faces_to_delete = []
+                if "delete_face_indices" in opt_data:
+                    for f_idx in opt_data["delete_face_indices"]:
+                        if f_idx < len(bm.faces):
+                            faces_to_delete.append(bm.faces[f_idx])
+                            
+                edges_to_dissolve = []
+                if "dissolve_edge_vertex_pairs" in opt_data:
+                    for v1_idx, v2_idx in opt_data["dissolve_edge_vertex_pairs"]:
+                        if v1_idx < len(bm.verts) and v2_idx < len(bm.verts):
+                            v1 = bm.verts[v1_idx]
+                            v2 = bm.verts[v2_idx]
+                            edge = bm.edges.get((v1, v2))
+                            if edge:
+                                # Ensure this edge doesn't belong to a face we are about to delete
+                                if not any(f in faces_to_delete for f in edge.link_faces):
+                                    edges_to_dissolve.append(edge)
+                
+                if edges_to_dissolve:
+                    bmesh.ops.dissolve_edges(bm, edges=edges_to_dissolve, use_verts=True)
+                    
+                valid_faces = [f for f in faces_to_delete if f.is_valid]
+                if valid_faces:
+                    bmesh.ops.delete(bm, geom=valid_faces, context='FACES')
+                    
+                bmesh.update_edit_mesh(eyes_obj.data)
+                bpy.ops.object.mode_set(mode='OBJECT')
+
+            moisture_idx = -1
+            eye_idx = -1
             
-            for i, slot in enumerate(mouth_obj.material_slots):
-                if slot.material:
-                    name_lower = slot.material.name.lower()
-                    if "mouth" in name_lower:
-                        mouth_mat_idx = i
-                    elif "teeth" in name_lower:
-                        teeth_mat_idx = i
+            for i, slot in enumerate(eyes_obj.material_slots):
+                if not slot.material: continue
+                name_lower = slot.material.name.lower()
+                if "moisture" in name_lower: moisture_idx = i
+                elif "eye" in name_lower or "sclera" in name_lower or "cornea" in name_lower:
+                    eye_idx = i
+                    
+            # Scale Moisture Up by 1.05
+            if moisture_idx != -1:
+                context.view_layer.objects.active = eyes_obj
+                bpy.ops.object.mode_set(mode='EDIT')
+                bm = bmesh.from_edit_mesh(eyes_obj.data)
+                
+                verts_to_scale = set()
+                for f in bm.faces:
+                    if f.material_index == moisture_idx:
+                        for v in f.verts: verts_to_scale.add(v)
                         
-            if mouth_mat_idx != -1 and teeth_mat_idx != -1:
-                # Reassign polygons
-                for poly in mouth_obj.data.polygons:
-                    if poly.material_index == teeth_mat_idx:
-                        poly.material_index = mouth_mat_idx
+                import mathutils
+                left_eye_verts = []
+                right_eye_verts = []
                 
-                # Delete the teeth material slot
+                for v in verts_to_scale:
+                    if v.co.x > 0:
+                        left_eye_verts.append(v)
+                    else:
+                        right_eye_verts.append(v)
+                        
+                if left_eye_verts:
+                    center_l = sum((v.co for v in left_eye_verts), mathutils.Vector()) / len(left_eye_verts)
+                    for v in left_eye_verts:
+                        v.co = center_l + (v.co - center_l) * 1.05
+                        
+                if right_eye_verts:
+                    center_r = sum((v.co for v in right_eye_verts), mathutils.Vector()) / len(right_eye_verts)
+                    for v in right_eye_verts:
+                        v.co = center_r + (v.co - center_r) * 1.05
+                        
+                bmesh.update_edit_mesh(eyes_obj.data)
+                bpy.ops.object.mode_set(mode='OBJECT')
+                
+            if moisture_idx != -1 and eye_idx != -1:
+                for poly in eyes_obj.data.polygons:
+                    if poly.material_index == moisture_idx:
+                        poly.material_index = eye_idx
                 bpy.ops.object.select_all(action='DESELECT')
-                mouth_obj.select_set(True)
-                context.view_layer.objects.active = mouth_obj
-                mouth_obj.active_material_index = teeth_mat_idx
+                eyes_obj.select_set(True)
+                context.view_layer.objects.active = eyes_obj
+                eyes_obj.active_material_index = moisture_idx
                 bpy.ops.object.material_slot_remove()
 
-            # Force all Mouth/Teeth UVs into the exact [1, 2] UDIM tile
-            if mouth_obj.data.uv_layers.active:
-                for loop in mouth_obj.data.loops:
-                    # Collapse any existing UDIM offsets to [0, 1], then explicitly shift to [1, 2]
-                    current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
-                    mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
+            # Force all Eye UVs into the exact [2, 3] UDIM tile
+            if eyes_obj.data.uv_layers.active:
+                for loop in eyes_obj.data.loops:
+                    current_u = eyes_obj.data.uv_layers.active.data[loop.index].uv[0]
+                    eyes_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 2.0
 
-            # Force all Mouth/Teeth UVs into the exact [1, 2] UDIM tile
-            if mouth_obj.data.uv_layers.active:
-                for loop in mouth_obj.data.loops:
-                    # Collapse any existing UDIM offsets to [0, 1], then explicitly shift to [1, 2]
-                    current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
-                    mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
-
-            # Join Mouth into Head
-            head_obj.hide_set(False)
-            head_obj.hide_viewport = False
-            
-            bpy.ops.object.select_all(action='DESELECT')
-            mouth_obj.select_set(True)
-            head_obj.select_set(True)
-            context.view_layer.objects.active = head_obj
-            bpy.ops.object.join()
-
-        # Update scene variables
         scene.mastersk_mesh_obj = body_obj
         scene.mastersk_body_mesh = body_obj
         scene.mastersk_head_mesh = head_obj
         scene.mastersk_daz_armature = body_arm
 
-        self.report({'INFO'}, f"Step 7 Complete: Baked {baked} ARKit keys, Purged {deleted} FACS keys, Renamed {renamed} JCMs.")
+        self.report({'INFO'}, "Step 7 Complete: Geometry isolated and topology optimized safely.")
         scene.mastersk_progress_step = 8
         return {'FINISHED'}
-
-
-
-

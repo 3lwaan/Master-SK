@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.1.0] - 2026-08-29
+
+### Added
+- **Automated Eye Mesh Integration:** Added comprehensive pipeline logic for optimizing and integrating the Genesis 9 Eyes mesh. The script automatically detects the mesh, applies the kinematic rest pose offset, surgically deletes hidden faces and dissolves excessive edge loops using pre-calculated JSON optimization mapping, geometrically scales the moisture shells by 1.05 to prevent clipping, merges the internal moisture and eye materials, forcibly sequences the UVs into the `[2, 3]` UDIM tile, preserves the critical `EyePupilsDilate` shape key, and finally joins the optimized eyes into the Head mesh.
+- **Structural UI Refactor:** Split the computationally heavy Step 7 into two distinct buttons to improve stability and prevent segmentation faults during BMesh topology operations.
+
 ## [4.0.0] - 2026-08-28
 
 ### Added
