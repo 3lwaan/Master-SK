@@ -21,6 +21,8 @@ from .operators.op_split_meshes import MASTERSK_OT_split_meshes
 from .operators.op_append_skeleton import MASTERSK_OT_append_skeleton
 from .operators.op_snap_joints import MASTERSK_OT_snap_joints
 from .operators.op_purge_and_join import MASTERSK_OT_purge_and_join
+from .operators.op_unified_optimize import MASTERSK_OT_unified_optimize
+from .operators.op_unified_finalize import MASTERSK_OT_unified_finalize
 from .operators.op_finalize_rigs import MASTERSK_OT_finalize_rigs, MASTERSK_OT_spine_warning_popup
 from .ui.panel import MASTERSK_OT_auto_detect, MASTERSK_OT_reset_progress, MASTERSK_PT_main_panel
 
@@ -32,6 +34,8 @@ classes = (
     MASTERSK_OT_match_rest_pose,
     MASTERSK_OT_split_meshes,
     MASTERSK_OT_purge_and_join,
+    MASTERSK_OT_unified_optimize,
+    MASTERSK_OT_unified_finalize,
     MASTERSK_OT_append_skeleton,
     MASTERSK_OT_snap_joints,
     MASTERSK_OT_finalize_rigs,
@@ -116,12 +120,28 @@ def register():
         poll=poll_mesh
     )
 
+    bpy.types.Scene.mastersk_workflow_type = bpy.props.EnumProperty(
+        name="Workflow",
+        description="Select the output character workflow",
+        items=[
+            ('MODULAR', "Modular (Split Head & Body)", "Generates separate head and body meshes/rigs"),
+            ('UNIFIED', "Unified (Single Mesh)", "Keeps character as a single mesh and deletes facial bones")
+        ],
+        default='MODULAR'
+    )
+
+    bpy.types.Scene.mastersk_unified_keep_shapekeys = bpy.props.BoolProperty(
+        name="Keep Shape Keys",
+        description="Preserve ARKit & Body shape keys on the unified mesh",
+        default=True
+    )
+
     bpy.types.Scene.mastersk_progress_step = bpy.props.IntProperty(
         name="Pipeline Progress",
         description="Current step in the MasterSK pipeline",
         default=1,
         min=1,
-        max=9
+        max=10
     )
 
     bpy.types.Scene.mastersk_morphs_imported = bpy.props.BoolProperty(
@@ -147,6 +167,8 @@ def unregister():
     del bpy.types.Scene.mastersk_als_armature
     del bpy.types.Scene.mastersk_daz_armature
     del bpy.types.Scene.mastersk_mesh_obj
+    del bpy.types.Scene.mastersk_workflow_type
+    del bpy.types.Scene.mastersk_unified_keep_shapekeys
     del bpy.types.Scene.mastersk_progress_step
 
 if __name__ == "__main__":

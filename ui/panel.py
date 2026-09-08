@@ -124,6 +124,15 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
 
         layout.separator(factor=0.8)
 
+        layout.separator(factor=0.8)
+
+        # 2.5 Workflow Selection Box
+        box_flow = layout.box()
+        box_flow.label(text="Workflow Output Type:", icon='NODE_COMPOSITING')
+        box_flow.prop(scene, "mastersk_workflow_type", text="")
+        if scene.mastersk_workflow_type == 'UNIFIED':
+            box_flow.prop(scene, "mastersk_unified_keep_shapekeys", text="Keep Shape Keys")
+
         # 3. Pre-Requisite Reminder
         box_import = layout.box()
         box_import.label(text="Pre-Requisite: Daz Import", icon='INFO')
@@ -140,7 +149,9 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         # Draw Visual Progress Bar
         step_val = scene.mastersk_progress_step
         row_prog = box_steps.row(align=True)
-        for i in range(1, 10):
+        max_steps = 9 if scene.mastersk_workflow_type == 'MODULAR' else 8
+        
+        for i in range(1, max_steps + 1):
             if i < step_val:
                 row_prog.label(text="", icon='CHECKBOX_HLT')
             elif i == step_val:
@@ -148,7 +159,7 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
             else:
                 row_prog.label(text="", icon='CHECKBOX_DEHLT')
 
-        if step_val > 9:
+        if step_val > max_steps:
             box_steps.label(text="Pipeline Complete!", icon='FILE_TICK')
         
         box_steps.separator()
@@ -192,26 +203,41 @@ class MASTERSK_PT_main_panel(bpy.types.Panel):
         r.operator("mastersk.snap_joints", text="6. Snap Joints & Lock Roll", icon='SNAP_ON')
         col.separator(factor=0.4)
 
-        # Step 7: Isolate & Optimize Geometry
-        r = col.row()
-        r.enabled = (step_val == 7)
-        r.operator("mastersk.split_meshes", text="7. Isolate & Optimize Geometry", icon='MOD_EXPLODE')
-        col.separator(factor=0.4)
+        if scene.mastersk_workflow_type == 'MODULAR':
+            # Step 7: Isolate & Optimize Geometry
+            r = col.row()
+            r.enabled = (step_val == 7)
+            r.operator("mastersk.split_meshes", text="7. Split & Optimize Geometry", icon='MOD_EXPLODE')
+            col.separator(factor=0.4)
 
-        # Step 8: Shape Key Purge & Integration
-        r = col.row()
-        r.enabled = (step_val == 8)
-        r.operator("mastersk.purge_and_join", text="8. Shape Key Purge & Integration", icon='MOD_SHRINKWRAP')
-        col.separator(factor=0.4)
+            # Step 8: Shape Key Purge & Integration
+            r = col.row()
+            r.enabled = (step_val == 8)
+            r.operator("mastersk.purge_and_join", text="8. Shape Key Purge & Integration", icon='MOD_SHRINKWRAP')
+            col.separator(factor=0.4)
 
-        # Step 9: Finalize & Dual Rig Setup
-        r = col.row()
-        r.enabled = (step_val == 9)
-        r.operator("mastersk.finalize_rigs", text="9. Finalize & Dual Rig Setup", icon='CHECKMARK')
-        col.separator(factor=0.4)
+            # Step 9: Finalize & Dual Rig Setup
+            r = col.row()
+            r.enabled = (step_val == 9)
+            r.operator("mastersk.finalize_rigs", text="9. Finalize & Dual Rig Setup", icon='CHECKMARK')
+            col.separator(factor=0.4)
+            
+            is_complete = (step_val >= 9)
+        else:
+            # UNIFIED WORKFLOW STEPS
+            # Step 7: Optimize & Join Full Mesh
+            r = col.row()
+            r.enabled = (step_val == 7)
+            r.operator("mastersk.unified_optimize", text="7. Optimize & Join Unified Mesh", icon='MOD_EXPLODE')
+            col.separator(factor=0.4)
 
-        r = col.row()
-        r.enabled = (step_val >= 9)
+            # Step 8: Finalize Single Rig Setup
+            r = col.row()
+            r.enabled = (step_val == 8)
+            r.operator("mastersk.unified_finalize", text="8. Finalize Single Rig Setup", icon='CHECKMARK')
+            col.separator(factor=0.4)
+            
+            is_complete = (step_val >= 8)
 
         # 5. Post-Processing Reminder
         layout.separator(factor=1.0)

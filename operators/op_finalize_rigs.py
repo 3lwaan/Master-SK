@@ -110,7 +110,7 @@ class MASTERSK_OT_finalize_rigs(bpy.types.Operator):
         # 6. Purge orphan data
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
 
-        self.report({'INFO'}, "Step 8 Complete: Generated clean 'root' and 'root_head' dual rigs ready for Unreal Engine 5.")
+        self.report({'INFO'}, "Step 9 Complete: Generated clean 'root' and 'root_head' dual rigs ready for Unreal Engine 5.")
         
         # Trigger the popup warning for manual spine alignment
         bpy.ops.mastersk.spine_warning_popup('INVOKE_DEFAULT')

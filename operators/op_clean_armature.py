@@ -60,7 +60,22 @@ class MASTERSK_OT_clean_armature(bpy.types.Operator):
         # --- Phase 3: Build the whitelist of bones to keep ---
         # char_root_name and "hip" are NOT in keep_set — they get deleted
         keep_set = set(config.BONES_TO_KEEP)
-        keep_set.update(facial_bones)
+        
+        if hasattr(scene, "mastersk_workflow_type") and scene.mastersk_workflow_type == 'UNIFIED':
+            # UNIFIED: Delete facial bones, but first transfer their weights to the head bone
+            if mesh_obj:
+                facial_vg_names = [b for b in facial_bones if b in mesh_obj.vertex_groups]
+                if facial_vg_names:
+                    if "head" not in mesh_obj.vertex_groups:
+                        mesh_obj.vertex_groups.new(name="head")
+                    weight_utils.merge_vertex_groups(
+                        mesh_obj,
+                        {"head": facial_vg_names},
+                        remove_sources=True
+                    )
+        else:
+            # MODULAR: Protect facial bones from deletion
+            keep_set.update(facial_bones)
 
         # --- Phase 4: Remove ALL bone constraints ---
         constraints_removed = 0
