@@ -10,7 +10,19 @@
 
 Integrating Genesis 9 characters into Unreal Engine's ALS ecosystem has traditionally been a frustrating, multi-day manual process involving tedious vertex weight repainting, destructive bone renaming, and highly error-prone joint alignment. 
 
-MasterSK eliminates this friction by providing a deterministic, 8-step programmatic pipeline. It guarantees 100% mechanical compatibility with the ALS Epic Mannequin while strictly preserving the integrity of the original Genesis 9 anatomical mesh weights and shapes.
+MasterSK eliminates this friction by providing a deterministic, programmatic pipeline. It guarantees 100% mechanical compatibility with the ALS Epic Mannequin while strictly preserving the integrity of the original Genesis 9 anatomical mesh weights and shapes.
+
+---
+
+## Recent Updates
+
+### **September 8, 2026: Unified Workflow Update**
+MasterSK now supports **two distinct output workflows**, switchable directly from the top of the UI panel:
+* **Modular (Dual Rig)**: The original pipeline. Splits the character into a separate Body (`root`) and Head (`root_head`) meshes/armatures, perfect for modular character customization.
+* **Unified (Single Rig)**: The new pipeline designed for background characters or unified models. Keeps the entire character as a single mesh bound to a single `root` armature. 
+    * **Intelligent Weight Transfer**: Surgically transfers all facial vertex groups to the `head` bone before deleting the facial skeleton, ensuring flawless neck/head rotation with zero frozen topology.
+    * **Custom UDIM Stacking**: Shifts the UV layout to a custom, game-ready UDIM setup (Head: `[0,0]`, Body: `[1,0]`, Legs: `[2,0]`, Arms/Nails: `[3,0]`, Eyes: `[0,1]`).
+    * **Dynamic Shape Key Control**: Allows the option to completely purge all shape keys for maximum performance, or keep the ARKit/Body shape keys intact.
 
 ---
 
@@ -24,8 +36,8 @@ MasterSK does not use heuristic guessing. It relies on exact mathematical transf
 4. **Kinematic Pose Matching:** Solves a kinematic vector alignment to rotate the Genesis 9 bones to precisely match the ALS A-Pose limbs, and bakes this deformation (along with all facial Shape Keys) into the character mesh as the new default rest pose.
 5. **Base Skeleton Injection:** Imports the true UE5 ALS Base Skeleton, dynamically scaling it to match the physical bounds of the Genesis 9 mesh without distorting proportions.
 6. **Joint Snapping (Roll Lock):** Mathematically snaps the head pivots of the ALS joints to the Genesis 9 joint coordinates, while strictly preserving the original ALS local axes (Roll). This ensures the UE5 IK retargeter receives perfect mathematical data.
-7. **Mesh Splitting, Facial Integration & UDIM Sequencing:** Non-destructively separates the head mesh from the body mesh. It then fully integrates the separated Genesis 9 Mouth and Eyes meshes (executing surgical topology optimization via JSON, scaling moisture shells, merging internal materials, preserving pupil dilation, and joining geometry). Finally, it executes a mathematical UV sequencer that dynamically arranges all meshes into a flawless UDIM layout (Torso: 1001, Legs/Mouth: 1002, Arms/Eyes: 1003) and runs a `numpy` shape key cleaner that instantly purges morph targets with zero geometric effect on the separated meshes.
-8. **Dual Rig Finalization:** Generates two distinct, production-ready output rigs (`root` for the body, `root_head` for the facial rig) tailored for modular UE5 construction. The Head Rig seamlessly integrates the spine, clavicles, upper arms, and the full uncompromised Daz3D facial skeleton, powered by a zero-length bone preservation safeguard.
+7. **Mesh Splitting, Facial Integration & UDIM Sequencing:** Non-destructively processes the mesh based on the selected workflow (Modular or Unified). It integrates the Genesis 9 Mouth and Eyes meshes (scaling moisture shells, mapping custom UDIMs, preserving pupil dilation). 
+8. **Rig Finalization:** Generates production-ready output rigs (`root` for the body, and `root_head` if using the Modular workflow) tailored for UE5 construction.
 
 ---
 
@@ -43,12 +55,9 @@ MasterSK is designed to be executed sequentially.
 
 1. Open the **Sidebar (N)** in the 3D Viewport and locate the **MasterSK** tab.
 2. Select your imported Genesis 9 Mesh. The addon will attempt to auto-detect its corresponding Armature.
-3. Execute **Steps 1 through 4** in exact order. 
-4. Execute **Step 5** to append the ALS Reference Skeleton.
-5. Execute **Step 6** to mathematically snap the joints.
-6. Execute **Step 7** to split the head and body meshes.
-7. Execute **Step 8** to finalize the dual rigs.
-   > **Note:** A prompt will appear reminding you to manually verify the Z-axis placement of the `spine_01`, `spine_02`, and `spine_03` bones in Edit Mode to ensure they visually match your preferred mesh weight envelopes before exporting.
+3. Choose your desired output pipeline from the **Workflow Output Type** dropdown (Modular or Unified).
+4. Execute the steps in exact order from top to bottom.
+   > **Note:** At the end of the pipeline, a prompt will appear reminding you to manually verify the Z-axis placement of the `spine_01`, `spine_02`, and `spine_03` bones in Edit Mode to ensure they visually match your preferred mesh weight envelopes before exporting.
 
 ## License
 Proprietary. Developed for internal production pipelines.

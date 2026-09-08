@@ -63,16 +63,18 @@ class MASTERSK_OT_clean_armature(bpy.types.Operator):
         
         if hasattr(scene, "mastersk_workflow_type") and scene.mastersk_workflow_type == 'UNIFIED':
             # UNIFIED: Delete facial bones, but first transfer their weights to the head bone
-            if mesh_obj:
-                facial_vg_names = [b for b in facial_bones if b in mesh_obj.vertex_groups]
-                if facial_vg_names:
-                    if "head" not in mesh_obj.vertex_groups:
-                        mesh_obj.vertex_groups.new(name="head")
-                    weight_utils.merge_vertex_groups(
-                        mesh_obj,
-                        {"head": facial_vg_names},
-                        remove_sources=True
-                    )
+            # We must do this for ALL meshes, especially the eyes and mouth!
+            for m_obj in [mesh_obj, scene.mastersk_mouth_mesh, scene.mastersk_eyes_mesh]:
+                if m_obj and m_obj.type == 'MESH':
+                    facial_vg_names = [b for b in facial_bones if b in m_obj.vertex_groups]
+                    if facial_vg_names:
+                        if "head" not in m_obj.vertex_groups:
+                            m_obj.vertex_groups.new(name="head")
+                        weight_utils.merge_vertex_groups(
+                            m_obj,
+                            {"head": facial_vg_names},
+                            remove_sources=True
+                        )
         else:
             # MODULAR: Protect facial bones from deletion
             keep_set.update(facial_bones)

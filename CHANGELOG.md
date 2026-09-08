@@ -5,6 +5,15 @@ All notable changes to the MasterSK addon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-09-08
+
+### Added
+- **Unified Workflow Support:** Introduced a comprehensive dual-workflow toggle directly in the UI. Users can now choose between the original `Modular` workflow (Dual Rig) and the new `Unified` workflow (Single Rig), perfect for background characters.
+- **Intelligent Facial Weight Transfer (Unified):** During Step 2 in the Unified workflow, the addon now intelligently scans all meshes (Body, Eyes, Mouth) and perfectly transfers the weights of every facial vertex group into the `head` bone before the facial bones are permanently deleted. This guarantees flawless neck/head rotation with zero geometric freezing.
+- **Custom UDIM Stacking (Unified):** Completely rewrote the UV optimization logic for the Unified mesh to map all elements into a pristine, game-ready UDIM setup without manual editing (Head: `[0,0]`, Body: `[1,0]`, Legs: `[2,0]`, Arms/Nails: `[3,0]`, Eyes: `[0,1]`).
+- **Dynamic Shape Key Control (Unified):** Added a contextual "Keep Shape Keys" toggle for the Unified pipeline, allowing riggers to aggressively purge all shape keys for maximum rendering performance, or selectively preserve ARKit and Body targets.
+- **Non-Destructive Mouth Purging (Unified):** Re-engineered the mesh joining logic to strictly exclude the Mouth/Teeth geometry from merging into the primary body mesh, keeping the scene topography clean.
+
 
 ## [4.1.0] - 2026-08-29
 

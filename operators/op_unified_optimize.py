@@ -25,10 +25,63 @@ class MASTERSK_OT_unified_optimize(bpy.types.Operator):
             return {'CANCELLED'}
 
         # ---------------------------------------------------------------------
-        # 1. OPTIMIZE MATERIALS & UVS ON MAIN MESH
+        # 1. OPTIMIZE MATERIALS & UVS ON MAIN MESH (CUSTOM UNIFIED)
         # ---------------------------------------------------------------------
         try:
-            mesh_utils.optimize_materials_and_uvs(mesh_obj)
+            # First, clean unused slots
+            mesh_utils.clean_unused_material_slots(mesh_obj)
+            
+            # Identify indices
+            head_idx, arms_idx = -1, -1
+            mouth_indices, nail_indices = set(), set()
+            for i, slot in enumerate(mesh_obj.material_slots):
+                if not slot.material: continue
+                name = slot.material.name.lower()
+                if "head" in name or "face" in name: head_idx = i
+                elif "arm" in name: arms_idx = i
+                elif "mouth" in name or "cavity" in name: mouth_indices.add(i)
+                elif "nail" in name: nail_indices.add(i)
+                
+            import json
+            uv_data = {}
+            json_path = os.path.join(os.path.dirname(__file__), "..", "data", "nail_uv_data.json")
+            if os.path.exists(json_path):
+                with open(json_path, 'r') as jf:
+                    try: uv_data = {int(k): v for k, v in json.load(jf).items()}
+                    except: pass
+
+            mesh = mesh_obj.data
+            uv_layer = mesh.uv_layers.active
+            for poly in mesh.polygons:
+                if poly.material_index in mouth_indices and head_idx != -1:
+                    poly.material_index = head_idx
+                elif poly.material_index in nail_indices and arms_idx != -1:
+                    poly.material_index = arms_idx
+                    if uv_layer and uv_data:
+                        for loop_idx in poly.loop_indices:
+                            if loop_idx in uv_data:
+                                uv_layer.data[loop_idx].uv = uv_data[loop_idx]
+                    
+            mesh_utils.clean_unused_material_slots(mesh_obj)
+            
+            # UDIM Shift for UNIFIED mesh
+            # Head: [0,0], Body: [1,0], Legs: [2,0], Arms: [3,0]
+            uv_layer = mesh.uv_layers.active
+            if uv_layer:
+                for poly in mesh.polygons:
+                    mat_idx = poly.material_index
+                    if mat_idx >= len(mesh_obj.material_slots) or not mesh_obj.material_slots[mat_idx].material:
+                        continue
+                        
+                    mat_name = mesh_obj.material_slots[mat_idx].material.name.lower()
+                    shift_x = 0.0
+                    if "body" in mat_name or "torso" in mat_name: shift_x = 1.0
+                    elif "leg" in mat_name: shift_x = 2.0
+                    elif "arm" in mat_name or "nail" in mat_name: shift_x = 3.0
+                    
+                    for loop_idx in poly.loop_indices:
+                        current_u = uv_layer.data[loop_idx].uv[0]
+                        uv_layer.data[loop_idx].uv[0] = (current_u % 1.0) + shift_x
         except Exception as e:
             self.report({'WARNING'}, f"Material/UV optimization failed: {e}")
 
@@ -62,11 +115,7 @@ class MASTERSK_OT_unified_optimize(bpy.types.Operator):
                 mouth_obj.active_material_index = teeth_mat_idx
                 bpy.ops.object.material_slot_remove()
 
-            # Shift Mouth UVs
-            if mouth_obj.data.uv_layers.active:
-                for loop in mouth_obj.data.loops:
-                    current_u = mouth_obj.data.uv_layers.active.data[loop.index].uv[0]
-                    mouth_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 1.0
+            pass # Mouth will be deleted later
 
         # ---------------------------------------------------------------------
         # 3. EYES MESH PREPARATION
@@ -165,11 +214,13 @@ class MASTERSK_OT_unified_optimize(bpy.types.Operator):
                 eyes_obj.active_material_index = moisture_idx
                 bpy.ops.object.material_slot_remove()
 
-            # Shift Eyes UVs
+            # Shift Eyes UVs to [0,1]
             if eyes_obj.data.uv_layers.active:
                 for loop in eyes_obj.data.loops:
                     current_u = eyes_obj.data.uv_layers.active.data[loop.index].uv[0]
-                    eyes_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0) + 2.0
+                    current_v = eyes_obj.data.uv_layers.active.data[loop.index].uv[1]
+                    eyes_obj.data.uv_layers.active.data[loop.index].uv[0] = (current_u % 1.0)
+                    eyes_obj.data.uv_layers.active.data[loop.index].uv[1] = (current_v % 1.0) + 1.0
 
 
         # ---------------------------------------------------------------------
@@ -204,17 +255,25 @@ class MASTERSK_OT_unified_optimize(bpy.types.Operator):
             if eyes_obj and eyes_obj.type == 'MESH' and eyes_obj.data.shape_keys: eyes_obj.shape_key_clear()
 
         # ---------------------------------------------------------------------
-        # 5. JOIN MESHES
+        # 5. JOIN MESHES AND CLEANUP
         # ---------------------------------------------------------------------
+        # Remove orphaned facial vertex groups from the mesh
+        from .op_split_meshes import clean_vertex_groups
+        clean_vertex_groups(mesh_obj, arm_obj)
+        if eyes_obj: clean_vertex_groups(eyes_obj, arm_obj)
+        
         bpy.ops.object.mode_set(mode='OBJECT')
         bpy.ops.object.select_all(action='DESELECT')
         
         context.view_layer.objects.active = mesh_obj
         mesh_obj.select_set(True)
-        if mouth_obj and mouth_obj.type == 'MESH': mouth_obj.select_set(True)
         if eyes_obj and eyes_obj.type == 'MESH': eyes_obj.select_set(True)
         
         bpy.ops.object.join()
+        
+        if mouth_obj and mouth_obj.type == 'MESH':
+            # Do nothing, leave it in the scene as requested
+            pass
 
         # Re-apply Armature Modifier
         for mod in mesh_obj.modifiers:
