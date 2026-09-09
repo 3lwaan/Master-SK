@@ -147,6 +147,7 @@ def clean_body_shape_keys(body_obj):
             sk.data[i].co = basis_co[i] + (delta * 2.0)
 
     cleaned_count = 0
+    preserved_body_keys = set()
     for sk in body_obj.data.shape_keys.key_blocks:
         if sk.name == "Basis":
             continue
@@ -174,14 +175,17 @@ def clean_body_shape_keys(body_obj):
                 pass # it will just keep its original name and we delete it in the next loop
             else:
                 sk.name = new_sk_name
+                preserved_body_keys.add(sk.name)
             cleaned_count += 1
         else:
             # Fallback just strip prefixes if somehow missed
             if original_name.startswith("body_bs_"):
                 sk.name = original_name.replace("body_bs_", "")
+                preserved_body_keys.add(sk.name)
                 cleaned_count += 1
             elif original_name.startswith("body_cbs_"):
                 sk.name = original_name.replace("body_cbs_", "")
+                preserved_body_keys.add(sk.name)
                 cleaned_count += 1
 
     keys_to_delete_final = []
@@ -206,7 +210,7 @@ def clean_body_shape_keys(body_obj):
     for sk in keys_to_delete_final:
         body_obj.shape_key_remove(sk)
 
-    return cleaned_count
+    return preserved_body_keys
 
 class MASTERSK_OT_split_meshes(bpy.types.Operator):
     """Step 7: Separate the character mesh and rig into Head and Body components"""

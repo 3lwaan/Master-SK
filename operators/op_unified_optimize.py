@@ -227,10 +227,53 @@ class MASTERSK_OT_unified_optimize(bpy.types.Operator):
         # 4. SHAPE KEY PROCESSING
         # ---------------------------------------------------------------------
         if scene.mastersk_unified_keep_shapekeys:
-            # Bake ARKit and clean body just like modular
-            bake_arkit_shape_keys(mesh_obj)
+            # First, clean body keys (renames them to AAA standards and applies 2x multiplier)
+            # This returns a set of all valid, preserved body key names!
+            preserved_body_keys = clean_body_shape_keys(mesh_obj)
+            if preserved_body_keys is None:
+                preserved_body_keys = set()
+            
+            # Custom Unified ARKit Bake: Bakes ARKit keys and DELETES EVERYTHING ELSE except preserved body keys
+            if mesh_obj.data.shape_keys:
+                import numpy as np
+                existing_kbs = {kb.name: kb for kb in mesh_obj.data.shape_keys.key_blocks}
+                basis = mesh_obj.data.shape_keys.key_blocks[0]
+                v_count = len(basis.data)
+                
+                if v_count > 0:
+                    basis_co = np.zeros(v_count * 3, dtype=np.float32)
+                    basis.data.foreach_get("co", basis_co)
+                    
+                    # Bake ARKit Keys
+                    for arkit_name, facs_list in config.ARKIT_BAKING_MAP.items():
+                        if arkit_name in existing_kbs: continue
+                        has_any = any(facs_name in existing_kbs for facs_name in facs_list)
+                        if not has_any: continue
+                            
+                        new_kb = mesh_obj.shape_key_add(name=arkit_name, from_mix=False)
+                        blended_co = np.copy(basis_co)
+                        
+                        for facs_name in facs_list:
+                            if facs_name in existing_kbs:
+                                source_kb = existing_kbs[facs_name]
+                                source_co = np.zeros(v_count * 3, dtype=np.float32)
+                                source_kb.data.foreach_get("co", source_co)
+                                blended_co += (source_co - basis_co)
+                                
+                        new_kb.data.foreach_set("co", blended_co)
+                        
+                    # Prune EVERYTHING except ARKit keys and Preserved Body Keys!
+                    blocks = mesh_obj.data.shape_keys.key_blocks
+                    for i in range(len(blocks)-1, 0, -1):
+                        kb = blocks[i]
+                        # Basis is always kept
+                        if kb.name == "Basis": continue
+                        
+                        if kb.name not in config.ARKIT_BAKING_MAP and kb.name not in preserved_body_keys:
+                            mesh_obj.shape_key_remove(kb)
+            
+            # Finally, clean empty keys (purges anything that has 0 effect)
             clean_empty_shape_keys(mesh_obj)
-            clean_body_shape_keys(mesh_obj)
 
             if mouth_obj and mouth_obj.type == 'MESH' and mouth_obj.data.shape_keys:
                 mouth_obj.shape_key_clear()

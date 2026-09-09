@@ -523,6 +523,20 @@ JCM_AAA_NAMING_MAP = \
             "Z": 80
         }
     },
+    "head_x25p": {
+        "new_name": "DELETE_ME",
+        "daz_bone": "head",
+        "rotations": {
+            "X": 25
+        }
+    },
+    "head_x30n": {
+        "new_name": "DELETE_ME",
+        "daz_bone": "head",
+        "rotations": {
+            "X": -30
+        }
+    },
     "neck1_x25n": {
         "new_name": "DELETE_ME",
         "daz_bone": "neck_01",
@@ -549,6 +563,20 @@ JCM_AAA_NAMING_MAP = \
         "daz_bone": "neck_01_r",
         "rotations": {
             "Z": 40
+        }
+    },
+    "neck1_y22n_r": {
+        "new_name": "DELETE_ME",
+        "daz_bone": "neck_01_r",
+        "rotations": {
+            "Y": -22
+        }
+    },
+    "neck1_y22p_l": {
+        "new_name": "DELETE_ME",
+        "daz_bone": "neck_01_l",
+        "rotations": {
+            "Y": 22
         }
     },
     "pelvis_x25n": {
