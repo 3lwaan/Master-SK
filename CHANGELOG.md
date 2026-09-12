@@ -5,6 +5,15 @@ All notable changes to the MasterSK addon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.1] - 2026-09-12
+
+### Fixed
+- **Anatomical Finger Bone Alignment & Curl (Step 6):** Resolved a critical orientation flaw where ALS template finger bone vectors (`tail - head`) were statically preserved from the ALS mannequin, causing finger bones on Genesis 9 characters to misalign with the anatomical finger axis and bend off-axis with sideways shearing when rotated in Pose Mode. Implemented `snap_als_finger_bone_to_daz` to dynamically reconstruct each finger bone's 3D coordinate frame in Edit Mode:
+  - **UE Local X:** Aligned longitudinally along the character's anatomical finger segment directly to the child joint (or fingertip for distal phalanges).
+  - **UE Local Z:** Realigned to the character's natural flexion/curl hinge plane.
+  - **UE Local Y (`tail - head`):** Formed via cross product ($\\vec{u}_Z \\times \\vec{u}_X$), ensuring visual bone cones point cleanly and consistently across the knuckles parallel to each other.
+  - Guarantees 100% clean, realistic finger curling into a fist in Pose Mode while maintaining flawless Unreal Engine ALS animation compatibility.
+
 ## [4.2.0] - 2026-09-08
 
 ### Added

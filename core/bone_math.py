@@ -237,6 +237,8 @@ def solve_als_named_apose(arm_obj, als_arm):
         
         bpy.context.view_layer.update()
 
+
+
     # --- AUTO-GROUNDING POST-CALCULATION ---
     if z_before_ankle is not None:
         bpy.context.view_layer.update()
@@ -450,6 +452,79 @@ def snap_als_bone_to_daz(edit_bone, daz_head_w, armature_world_inv):
     edit_bone.head = local_head
     edit_bone.tail = local_head + orig_vector
 
+FINGER_CHILD_MAP = {
+    # Left
+    "thumb_01_l": "thumb_02_l",
+    "thumb_02_l": "thumb_03_l",
+    "thumb_03_l": None,
+    "index_01_l": "index_02_l",
+    "index_02_l": "index_03_l",
+    "index_03_l": None,
+    "middle_01_l": "middle_02_l",
+    "middle_02_l": "middle_03_l",
+    "middle_03_l": None,
+    "ring_01_l": "ring_02_l",
+    "ring_02_l": "ring_03_l",
+    "ring_03_l": None,
+    "pinky_01_l": "pinky_02_l",
+    "pinky_02_l": "pinky_03_l",
+    "pinky_03_l": None,
+    # Right
+    "thumb_01_r": "thumb_02_r",
+    "thumb_02_r": "thumb_03_r",
+    "thumb_03_r": None,
+    "index_01_r": "index_02_r",
+    "index_02_r": "index_03_r",
+    "index_03_r": None,
+    "middle_01_r": "middle_02_r",
+    "middle_02_r": "middle_03_r",
+    "middle_03_r": None,
+    "ring_01_r": "ring_02_r",
+    "ring_02_r": "ring_03_r",
+    "ring_03_r": None,
+    "pinky_01_r": "pinky_02_r",
+    "pinky_02_r": "pinky_03_r",
+    "pinky_03_r": None,
+}
+
+def snap_als_finger_bone_to_daz(edit_bone, daz_bone_name, daz_bones, als_armature_obj):
+    """
+    Dynamically aligns an ALS finger bone in Edit Mode so that:
+    1. UE Local X points longitudinally along the character's finger segment (to child joint).
+    2. UE Local Z matches the character's anatomical finger curl hinge plane.
+    3. UE Local Y (Blender edit bone vector tail - head) is strictly orthogonal across the knuckles.
+    Preserves exact length while guaranteeing clean, realistic curling without twisting.
+    """
+    daz_head_w, daz_tail_w, daz_mat_w = daz_bones[daz_bone_name]
+    child_name = FINGER_CHILD_MAP.get(daz_bone_name)
+    
+    if child_name and child_name in daz_bones:
+        v_child_w = (daz_bones[child_name][0] - daz_head_w).normalized()
+    else:
+        v_child_w = (daz_tail_w - daz_head_w).normalized()
+        
+    als_inv_mat = als_armature_obj.matrix_world.inverted()
+    als_rot_inv = als_armature_obj.matrix_world.to_3x3().inverted()
+    
+    local_head = als_inv_mat @ daz_head_w
+    v_child = (als_rot_inv @ v_child_w).normalized()
+    hinge_local = (als_rot_inv @ (daz_mat_w.to_3x3() @ Vector((1, 0, 0)))).normalized()
+    
+    is_right = daz_bone_name.endswith("_r")
+    u_X = -v_child if is_right else v_child
+    u_Z = (hinge_local - (hinge_local.dot(u_X)) * u_X).normalized()
+    u_Y = u_Z.cross(u_X).normalized()
+    
+    orig_length = edit_bone.length
+    mat = Matrix((
+        (u_X.x, u_Y.x, u_Z.x, local_head.x),
+        (u_X.y, u_Y.y, u_Z.y, local_head.y),
+        (u_X.z, u_Y.z, u_Z.z, local_head.z),
+        (0.0,   0.0,   0.0,   1.0)
+    ))
+    edit_bone.matrix = mat
+    edit_bone.length = orig_length
+
 def snap_als_skeleton_to_daz(als_armature_obj, daz_armature_obj, bone_mapping):
     if als_armature_obj.type != 'ARMATURE' or daz_armature_obj.type != 'ARMATURE':
         raise ValueError("Both objects must be armatures.")
@@ -466,8 +541,11 @@ def snap_als_skeleton_to_daz(als_armature_obj, daz_armature_obj, bone_mapping):
     for als_bone_name in bone_mapping.values():
         if als_bone_name in edit_bones and als_bone_name in daz_bones:
             eb = edit_bones[als_bone_name]
-            daz_head_w, daz_tail_w, _ = daz_bones[als_bone_name]
-            snap_als_bone_to_daz(eb, daz_head_w, als_inv_mat)
+            if als_bone_name in FINGER_CHILD_MAP:
+                snap_als_finger_bone_to_daz(eb, als_bone_name, daz_bones, als_armature_obj)
+            else:
+                daz_head_w, daz_tail_w, _ = daz_bones[als_bone_name]
+                snap_als_bone_to_daz(eb, daz_head_w, als_inv_mat)
             snapped_count += 1
 
     snap_als_ik_bones(edit_bones)

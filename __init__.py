@@ -1,7 +1,7 @@
 bl_info = {
     "name": "MasterSK - Genesis 9 to ALS Pipeline",
     "author": "Gate Studio / Antigravity",
-    "version": (4, 1, 0),
+    "version": (4, 2, 1),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > MasterSK Tab",
     "description": "Automated Daz Genesis 9 to ALS skeleton replacement, roll-locked joint snapping, and modular Body/Face dual-rig generation for Unreal Engine 5.",
